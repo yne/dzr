@@ -1,0 +1,32 @@
+#!/bin/sh
+SERVER=https://gitlab.com/fckdzr/dzr-db/raw/master
+DBS=$(curl -s https://gitlab.com/fckdzr/dzr-db/files/master?format=json | jq -r .[] | grep -P '\.(bin|txt)')
+
+resolve(){
+	id=$1
+	for f in $DBS; do
+		START=$(echo $f | cut -f1 -d-)
+		END=$(echo $f | cut -f2 -d-)
+		STEP=$(echo $f | cut -f3 -d-| cut -f1 -d.)
+		TYPE=$(echo $f | cut -f2 -d.)
+		if [ $id -ge $START -a $id -le $END ] ; then
+			DB=$f
+			break;
+		fi
+	done
+
+	[ -z "$DB" ] && echo "$id not in db" 1>&2 && return;
+
+	if [ "$TYPE" = bin ] ; then
+		IDX=$((($id-$START)/$STEP))
+		MD5=$(curl -sH Range:bytes=$((IDX*16))-$((IDX*16+15)) $SERVER/$DB | od -An -txC | tr -d ' ')
+	elif [ "$TYPE" = txt ] ; then
+		MD5=$(curl -s $SERVER/$DB | grep "^$id " | cut -f2 -d' ')
+	fi
+	echo $MD5:$id
+}
+
+for id in $@ ; do
+	resolve $id
+done
+
