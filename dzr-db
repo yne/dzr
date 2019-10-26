@@ -1,0 +1,41 @@
+#!/bin/sh
+
+SERVER=https://gitlab.com/fckdzr/dzr/raw/master
+DBS="0-199999-0.txt
+200000-365473-1.bin
+365474-506000-0.txt
+507533-18240991-1.bin
+18241001-60681991-10.bin
+60682000-79095802-1.bin
+79095803-145709108-2.bin
+354510101-409999999-10.bin
+510000001-570274000-10.bin"
+
+resolve(){
+	id=$1
+	for f in $DBS; do
+		START=$(echo $f | cut -f1 -d-)
+		END=$(echo $f | cut -f2 -d-)
+		STEP=$(echo $f | cut -f3 -d-| cut -f1 -d.)
+		TYPE=$(echo $f | cut -f2 -d.)
+		if [ $id -ge $START -a $id -le $END ] ; then
+			DB=$f
+			break
+		fi
+	done
+
+	[ -z "$DB" ] && echo "$id not found" 1>&2;
+
+	if [ "$TYPE" = bin ] ; then
+		IDX=$((($id-$START)/$STEP))
+		MD5=$(curl -sH Range:bytes=$((IDX*16))-$((IDX*16+15)) $SERVER/$DB | od -An -txC | tr -d ' ')
+	elif [ "$TYPE" = txt ] ; then
+		MD5=$(curl -s $SERVER/$DB | grep "^$id " | cut -f2 -d' ')
+	fi
+	echo $MD5:$id
+}
+
+for id in $@ ; do
+	resolve $id
+done
+
