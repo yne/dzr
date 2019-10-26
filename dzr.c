@@ -27,6 +27,7 @@
 
 #define expect(cond, fmt...) if(!(cond))return fprintf(stderr,"expect(" #cond ") failed \n" fmt),-1;
 #define HOST_WWW "www.deezer.com"
+#define HOST_API "api.deezer.com"
 #define HOST_CDN "e-cdn-proxy-0.deezer.com"
 #define GW(method) "/ajax/gw-light.php?method=" method "&api_version=1.0&input=3&api_token="
 #define PKCS5(total, current) (int)((total) - strlen(current))
@@ -131,9 +132,12 @@ char *getTokenFromSID(char *sid, char token[32 + 1]) {
 	      page, sizeof(page), NULL, NULL);
 	return memcpy(token, find(page, "checkForm\":\""), 32);
 }
-
+//fre84ab3c3a885631cdec4f9b874c0e67692b53e
 int getTrackInfo(char *sid, char *tkn, char *trackid, char md5[32 + 1], char artist[64 + 1], char title[64 + 1]) {
 	char page[1024 * 32];
+	if (*md5) {
+		return memcpy(title, md5, 64),0;
+	}
 	fetch("POST", GW("song.getListData"), tkn, HOST_WWW,
 	      (char *[]) {"Cookie: sid=", sid, "\r\n", 0},
 	      (char *[]) {"{\"sng_ids\":[", trackid, "]}", 0},
@@ -146,7 +150,7 @@ int getTrackInfo(char *sid, char *tkn, char *trackid, char md5[32 + 1], char art
 
 char *getTrackUrl(char *md5, int version, char *trackid, char *format, char url[160 + 1], AES_KEY*aes_key) {
 	char line[50] = {};
-	snprintf(line, sizeof(line), "%s\xA4%s\xA4%s\xA4%i", md5, format, trackid, version);
+	snprintf(line, sizeof(line), "%.32s\xA4%s\xA4%s\xA4%i", md5, format, trackid, version);
 	char *line_md5 = toHex(md5(line), 16, (char[32 + 48 + 1]) {}, "%02x");
 	sprintf(line_md5 + 32, "\xA4%s\xA4%c%c%c", line, PKCS5(46, line), PKCS5(46, line), PKCS5(46, line));
 	unsigned char pth[80];
@@ -197,7 +201,7 @@ int main(int argc, char *argv[]) {
 	argv++, argc--;
 	char *sid = getenv("DZR_SID")?:getenv("sid")?:getenv("SID");
 	char *bf = getenv("DZR_CBC"), *aes=getenv("DZR_AES"), *fmt = getenv("DZR_FMT") ?: "0";
-	if (argc < 1 || !sid || !bf || !aes)
+	if (argc < 1 || !bf || !aes)
 		return fprintf(stderr, USAGE, sid, aes, bf, fmt);
 	WSAStartup(MAKEWORD(2, 2), &(WSADATA) {});
 	SSL_library_init();
@@ -209,17 +213,23 @@ int main(int argc, char *argv[]) {
 	//if (dbg)fprintf(stderr, "token=%s\n", token);
 
 	for (char *track = *argv; argc; --argc, track = *++argv) {
-		for (; *track && !isdigit(*track); track++);//shift arg up to it the first digit
 		char md5[32 + 1] = {}, artist[64] = {}, title[64] = {};
+		if (!strcmp(track,"http")) { // track URL : shift arg up to it the first digit
+			for (; *track && !isdigit(*track); track++);
+		} else if (strlen(track) >= 32 && track[32]==':') { // "MD5:*:id" format
+			memcpy(md5,track,sizeof(md5)-1);
+			track += sizeof(md5);
+		}
 		int version = getTrackInfo(sid, token, track, md5, artist, title);
 		if(!*md5){continue;}/* private/blocked track */
-		int artist_len = (int) (strchr(artist, '"') - artist), title_len = (int) (strchr(title, '"') - title);
+		int artist_len = *artist ? (int) (strchr(artist, '"') - artist) : 0;
+		int title_len = *title ? (int) (strchr(title, '"') - title) : 0;
 		//if(dbg)fprintf(stderr, "version=%i md5=%s : %.*s - %.*s\n", version, md5, artist_len, artist, title_len, title);
 		char *url = getTrackUrl(md5, version, track, fmt, (char[160 + 1]) {}, &aes_key);
 		FILE *fd = stdout;
 		if (isatty(STDOUT_FILENO)) { // TTY == no STDOUT piping => output to a pre-named file
 			char mp3name[1024], *ext = fmt[0] == '9' ? "flac" : "mp3";
-			sprintf(mp3name, "%.*s - %.*s.%s", artist_len, artist, title_len, title, ext);
+			sprintf(mp3name, "%.*s%s%.*s.%s", artist_len, artist, (*artist && *title) ? " - " : "", title_len, title, ext);
 			fd = fopen(mp3name, "wb+");
 		}
 		fetchTrack(getTrackKey(track, bf, (BF_KEY[1]) {}), url, md5[0], fd);

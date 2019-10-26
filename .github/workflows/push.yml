@@ -4,12 +4,29 @@ on: [push]
 
 jobs:
   build:
-
-    runs-on: ubuntu-latest
-    
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
     steps:
     - uses: actions/checkout@v1
     - name: build
+      run: gcc dzr.c -lssl -lcrypto -o dzr
+    - name: package
+      run: tar -cz dzr dzr-db > dzr.tar.gz
+    - name: publish
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RUNNER_CONTEXT: ${{ toJson(runner) }}
       run: |
-        gcc dzr.c -lssl -lcrypto
-        ls -al
+        echo "$RUNNER_CONTEXT"
+        RELEASE_TAG="$(date +%y%m%d)"
+        curl -svL -XPOST -d '{"tag_name": "'$RELEASE_TAG'"}' \
+          -H "Authorization: Bearer $GITHUB_TOKEN" \
+          -H 'Content-Type: application/json' \
+          https://api.github.com/repos/${GITHUB_REPOSITORY}/releases
+        RELEASE_ID=$(curl -svL https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/$RELEASE_TAG|jq .id)
+        curl -svL -XPOST -T "dzr.tar.gz" \
+          -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Content-Type:application/octet-stream" \
+          https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID/assets?name=dzr.x86_64-linux.tar.gz
