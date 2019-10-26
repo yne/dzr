@@ -1,0 +1,14 @@
+#!/bin/sh
+#errcho() { cat <<< "$@" 1>&2; }
+self="$0"
+if [ $# -eq 0 ]; then
+	echo "NAME:\n	$0 query tracks ids"
+	echo "USAGE:\n	$0 [artist:|album:|track:]QUERY|ID"
+	echo "EXAMPLE:\n	$0 artist:Queen\n	$0 album:Greatest Hits\n	$0 track:Innuendo"
+	exit 1
+fi
+
+#type="$1";shift
+query=$(echo "$@" | tr ' ' +)
+url='https://api.deezer.com/search?strict=on&q="'$query'"'
+curl -s $url | jq -r .data[].id
