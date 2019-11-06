@@ -44,6 +44,6 @@ Once complete, you should have the following variable set in your `.bashrc`:
 dzr 997764 > my.mp3
 dzr 997764 | mpv --cache-secs 360 -
 DZR_FMT=9 dzr 997764 > my.flac
-dzr-api artist:joji | xargs dzr | mpv -
+dzr-api artist pink floyds | xargs dzr | mpv -
 ```
 
