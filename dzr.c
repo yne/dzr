@@ -29,25 +29,28 @@
 #define HOST_WWW "www.deezer.com"
 #define HOST_API "api.deezer.com"
 #define HOST_CDN "e-cdn-proxy-0.deezer.com"
-#define GW(method) "/ajax/gw-light.php?method=" method "&api_version=1.0&input=3&api_token="
+#define GWL(method) "/ajax/gw-light.php?method=" method "&api_version=1.0&input=3&api_token="
+#define GW(method) "/1.0/gateway.php?method=" method "&input=3&output=3"
 #define PKCS5(total, current) (int)((total) - strlen(current))
 
 #define USAGE "USAGE:\n"\
-              "  dzr [TRACK...][MD5:id...]\n"\
+              "  dzr [TRACK_URL...][TRACKID...][MD5:TRACKID...]\n"\
               "ENVIRONMENT:\n"\
-              "  - DZR_AES=%s\n"\
-              "  - DZR_CBC=%s\n"\
-              "  - DZR_SID=%s\n"\
-              "  - DZR_LUT=%s\n"\
-              "  - DZR_FMT=%s (opt) one of 128K:0, 320K:3, AAC96:8, FLAC:9\n"\
-              "  - DZR_DBG=1: (opt) true if defined\n"\
+              "  required:\n"\
+              "  - DZR_AES=%s # Key for track URL generation\n"\
+              "  - DZR_CBC=%s # Key for track decryption\n"\
+              "  one of them required:\n"\
+              "  - DZR_API=%s # register on developers.deezer.com\n"\
+              "  - DZR_SID=%s # personal SessionID\n"\
+              "  - DZR_LUT=%s # external trackID to MD5 resolver (ex:\"/path/to/dzr-db %%s\")\n"\
+              "  optional:\n"\
+              "  - DZR_FMT=%s {0=MP3@128 3=MP3@320 8=AAC@96, 9=FLAC}\n"\
+              "  - DZR_DBG\n"\
               "EXEMPLES:\n"\
               "  dzr 600629 > my.mp3\n"\
               "  DZR_FMT=9 dzr 600629 > my.flac\n"\
               "  dzr 600629 | mpv -\n"\
               ""
-/* according to RE on the JS (bullshit) */
-// MP3_MISC=0,MP3_128=1,MP3_320=3,MP3_256=5,MP3_192=7,AAC_96=8FLAC=9,MP3_64=10,MP3_32=11
 
 #define md5(line) MD5((unsigned char *) (line), strlen(line), (unsigned char[16]) {})
 
@@ -76,7 +79,7 @@ char *toHex(unsigned char *bin, size_t count, char *hex, char *fmt) {
 		sprintf(hex + (2 * i), fmt, bin[i]);
 	return hex;
 }
-
+//TODO: be more generic (host is a header+ char**params)
 int fetch(char *meth, char *path, char *params, char *host, char **fields, char **bodies, char *out, size_t outmax,
           int(*cb)(SSL*, size_t, void**), void**cb_args) {
 	int len = 0, tcp = socket(AF_INET, SOCK_STREAM, 0);
@@ -119,38 +122,49 @@ int fetch(char *meth, char *path, char *params, char *host, char **fields, char 
 	SSL_CTX_free(ctx);
 	return tcp;
 }
-
-char *getTokenFromSID(char *sid, char token[32 + 1]) {
-	char page[1024 * 32];
-	fetch("GET", GW("deezer.getUserData"), "", HOST_WWW,
-	      (char *[]) {"Cookie: sid=", sid, "\r\n", 0}, NULL,
+int getTrackInfoFromAPI(char *api, char *trackid, char md5[32 + 1], char artist[64 + 1], char title[64 + 1]) {
+	static char session[40 + 1];
+	char page[1024 * 32] = {};
+	if (!*session) {
+		fetch("GET", GWL("deezer.ping"), "", HOST_WWW, NULL, NULL, page, sizeof(page), NULL, NULL);
+		memcpy(session, find(page, "\"SESSION\":\""), sizeof(session) - 1);
+	}
+	char url[1024]={};//TODO: shall be in fetch()
+	snprintf(url, sizeof(url)-1, "&api_key=%s&sid=%s", api, session);
+	fetch("POST", GW("song.getData"), url, HOST_API, NULL,
+	      (char *[]) {"{\"sng_id\":", trackid ,"}", 0},
 	      page, sizeof(page), NULL, NULL);
-	return memcpy(token, find(page, "checkForm\":\""), 32);
+	memcpy(md5, find(page, "PUID\":\""), 32);
+	memcpy(artist, find(page, "SNG_TITLE\":\""), 64);
+	memcpy(title, find(page, "ART_NAME\":\""), 64);
+	return 0;
 }
-int getTrackInfo(char *sid, char *tkn, char *trackid, char md5[32 + 1], char artist[64 + 1], char title[64 + 1]) {
-	char page[1024 * 32];
-	if (*md5) {
-		return memcpy(title, md5, 64),0;
+int getTrackInfoFromSID(char *sid, char *trackid, char md5[32 + 1], char artist[64 + 1], char title[64 + 1]) {
+	char page[1024 * 32] = {};
+	static char tkn[32 + 1];
+	if (!*tkn) {
+		fetch("GET", GWL("deezer.getUserData"), "", HOST_WWW,
+			    (char *[]) {"Cookie: sid=", sid, "\r\n", 0}, NULL,
+			    page, sizeof(page), NULL, NULL);
+		memcpy(tkn, find(page, "checkForm\":\""), sizeof(tkn) - 1);
 	}
-	char* lut = getenv("DZR_LUT")?:"$_-db %s";
-	if (!tkn) {
-		snprintf(page, sizeof(page)-1, lut, trackid);
-		FILE *proc = popen(page, "r");
-		if(!proc || fread(md5, 32, 1, proc) != 1){
-			fprintf(stderr, "Unable to call: %s\n", page);
-			return -1;
-		}
-		pclose(proc);
-		return memcpy(title, md5, 64),0;
-	}
-	fetch("POST", GW("song.getListData"), tkn, HOST_WWW,
+
+	fetch("POST", GWL("song.getListData"), tkn, HOST_WWW,
 	      (char *[]) {"Cookie: sid=", sid, "\r\n", 0},
 	      (char *[]) {"{\"sng_ids\":[", trackid, "]}", 0},
 	      page, sizeof(page), NULL, NULL);
 	memcpy(md5, find(page, "MD5_ORIGIN\":\""), 32);
-	memcpy(artist, find(page, "SNG_TITLE\":\""), 64);
-	memcpy(title, find(page, "ART_NAME\":\""), 64);
+	memcpy(artist, find(page, "SNG_TITLE\":\""), 64 - 1);
+	memcpy(title, find(page, "ART_NAME\":\""), 64 - 1);
 	return (int) strtol(find(page, "MEDIA_VERSION\":\""), NULL, 0);
+}
+int getTrackInfoFromLUT(char *lut, char *trackid, char md5[32 + 1]) {
+	char cmdline[1024];
+	snprintf(cmdline, sizeof(cmdline)-1, lut, trackid);
+	FILE *proc = popen(cmdline, "r");
+	if(!proc || fread(md5, 32, 1, proc) != 1)
+		return fprintf(stderr, "Unable to call: %s\n", cmdline),-1;
+	return pclose(proc);
 }
 
 char *getTrackUrl(char *md5, int version, char *trackid, char *format, char url[160 + 1], AES_KEY*aes_key) {
@@ -204,29 +218,47 @@ int fetchTrack(BF_KEY *bf_key, char *path, char cdnId, FILE *fd) {
 
 int main(int argc, char *argv[]) {
 	argv++, argc--;
-	char *sid = getenv("DZR_SID"), *lut = getenv("DZR_LUT");
+	char *sid = getenv("DZR_SID"), *lut = getenv("DZR_LUT"), *api = getenv("DZR_API");
 	char *bf = getenv("DZR_CBC"), *aes=getenv("DZR_AES"), *fmt = getenv("DZR_FMT") ?: "0";
-	if (argc < 1 || !bf || !aes)
-		return fprintf(stderr, USAGE, aes, bf, sid?: "none => use DZR_LUT", lut, fmt);
+	int usage = !(argc) ? fprintf(stderr, "no argument specified\n\n"):
+              !(bf && aes) ? fprintf(stderr, "DZR_CBC and DZR_AES env variables must be defined\n\n"):
+              !(sid || lut || api) ? fprintf(stderr, "DZR_SID or DZR_LUT or DZR_API env variables must be defined\n\n"):
+              0;
+	if(usage)return fprintf(stderr, USAGE, aes, bf, api, sid, lut, fmt);
+
 	WSAStartup(MAKEWORD(2, 2), &(WSADATA) {});
 	SSL_library_init();
 
 	AES_KEY aes_key;// Used for CDN URL Generation
 	AES_set_encrypt_key((unsigned char *) aes, 128, &aes_key);
 
-	char *token = sid?getTokenFromSID(sid, (char[32 + 1]) {}):NULL;
-	//if (dbg)fprintf(stderr, "token=%s\n", token);
-
 	for (char *track = *argv; argc; --argc, track = *++argv) {
-		char md5[32 + 1] = {}, artist[64] = {}, title[64] = {};
-		if (!strcmp(track,"http")) { // track URL : shift arg up to it the first digit
-			for (; *track && !isdigit(*track); track++);
-		} else if (strlen(track) >= 32 && track[32]==':') { // "MD5:*:id" format
-			memcpy(md5,track,sizeof(md5)-1);
+		char md5[32 + 1] = {}, artist[64 + 1] = {}, title[64 + 1] = {};
+		int version = 0;
+		// argv parsing
+		if (!strncmp(track, "http", 4)) {
+			if (!strstr(track,"/track/")) {
+				fprintf(stderr, "only /track/ URL are supported (for now)... skip\n");continue;
+			}
+			for (; *track && !isdigit(*track); track++);//seek to {track,artist,album}id
+		} else if (strlen(track) >= 32 && track[32]==':') { // "MD5:trackid" format
+			memcpy(md5, track, sizeof(md5) - 1);
 			track += sizeof(md5);
 		}
-		int version = getTrackInfo(sid, token, track, md5, artist, title);
-		if(!*md5 || version<0){continue;}/* private/blocked track */
+		// Track to MD5 Resolving (if no provided by argv)
+		if (!*md5 && api) {
+			version = getTrackInfoFromAPI(api, track, md5, artist, title);
+		}
+		if (!*md5 && sid) {
+			version = getTrackInfoFromSID(sid, track, md5, artist, title);
+		}
+		if (!*md5 && lut) {
+			version = getTrackInfoFromLUT(lut, track, md5);
+		}
+		if (!*md5 || version < 0) {/* private/blocked track? */
+			fprintf(stderr,"unable to fetch track MD5 for %s (error:%i)... skip\n", track, version);
+			continue;
+		}
 		int artist_len = *artist ? (int) (strchr(artist, '"') - artist) : 0;
 		int title_len = *title ? (int) (strchr(title, '"') - title) : 0;
 		//if(dbg)fprintf(stderr, "version=%i md5=%s : %.*s - %.*s\n", version, md5, artist_len, artist, title_len, title);
@@ -234,7 +266,7 @@ int main(int argc, char *argv[]) {
 		FILE *fd = stdout;
 		if (isatty(STDOUT_FILENO)) { // TTY == no STDOUT piping => output to a pre-named file
 			char mp3name[1024], *ext = fmt[0] == '9' ? "flac" : "mp3";
-			sprintf(mp3name, "%.*s%s%.*s.%s", artist_len, artist, (*artist && *title) ? " - " : "", title_len, title, ext);
+			sprintf(mp3name, "%.*s%s%.*s.%s", artist_len, artist, (*artist && *title) ? " - " : "", title_len?:((int)sizeof(md5)-1), title_len?title:md5, ext);
 			fd = fopen(mp3name, "wb+");
 		}
 		fetchTrack(getTrackKey(track, bf, (BF_KEY[1]) {}), url, md5[0], fd);
