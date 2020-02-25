@@ -1,29 +1,30 @@
-//NIX build `gcc dzr.c -lssl -lcrypto -Wall -o dzr`
-//WIN build `tcc dzr.c libssl32.def libeay32.def ws2_32.def`
+//NIX build `gcc dzr.c` or `gcc dzr.c -DUSE_SSL -lssl -lcrypto`
+//WIN build `tcc dzr.c ws2_32.def` or `tcc dzr.c ws2_32.def -DUSE_SSL libssl32.def libeay32.def`
 #include <stdio.h>
-#include <fcntl.h>
+#include <stdlib.h> // getenv
 #include <string.h>
-#include <ctype.h>
 
 #ifdef _WIN32
 #include <winsock.h>
 #else
-
-#include <sys/socket.h>
-#include <unistd.h>
-#include <resolv.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-
+#include <unistd.h> // read/write/close
+#include <sys/socket.h> // socket
+#include <netdb.h> //gethostbyname
 #define closesocket close
 #define WSACleanup() ;
 #define WSAStartup(A, B) ;
 #endif
 
+#ifdef USE_SSL
+#define DZR_PORT 443
 #include <openssl/ssl.h>
 #include <openssl/md5.h>
 #include <openssl/aes.h>
 #include <openssl/blowfish.h>
+#else
+#define DZR_PORT 80
+#include "crypto.c"
+#endif
 
 #define expect(cond, fmt...) if(!(cond))return fprintf(stderr,"expect(" #cond ") failed \n" fmt),-1;
 #define HOST_WWW "www.deezer.com"
@@ -36,23 +37,21 @@
 #define USAGE "USAGE:\n"\
               "  dzr [TRACK_URL...][TRACKID...][MD5:TRACKID...]\n"\
               "ENVIRONMENT:\n"\
-              "  required:\n"\
+              "  Required:\n"\
               "  - DZR_AES=%s # Key for track URL generation\n"\
               "  - DZR_CBC=%s # Key for track decryption\n"\
-              "  one of them required:\n"\
-              "  - DZR_API=%s # register on developers.deezer.com\n"\
+              "  At least one is required:\n"\
+              "  - DZR_API=%s # (recommended) see developers.deezer.com\n"\
               "  - DZR_SID=%s # personal SessionID\n"\
               "  - DZR_LUT=%s # external trackID to MD5 resolver (ex:\"/path/to/dzr-db %%s\")\n"\
-              "  optional:\n"\
-              "  - DZR_FMT=%s {0=MP3@128 3=MP3@320 8=AAC@96, 9=FLAC}\n"\
+              "  Optional:\n"\
+              "  - DZR_FMT=%s # 0=MP3@128 3=MP3@320 8=AAC@96, 9=FLAC\n"\
               "  - DZR_DBG\n"\
               "EXEMPLES:\n"\
               "  dzr 600629 > my.mp3\n"\
               "  DZR_FMT=9 dzr 600629 > my.flac\n"\
               "  dzr 600629 | mpv -\n"\
               ""
-
-#define md5(line) MD5((unsigned char *) (line), strlen(line), (unsigned char[16]) {})
 
 char *find(char *buf, const char *pattern) {
 	char *found = strstr(buf, pattern);
@@ -85,13 +84,14 @@ int fetch(char *meth, char *path, char *params, char *host, char **fields, char 
 	int len = 0, tcp = socket(AF_INET, SOCK_STREAM, 0);
 	size_t clen = 0;
 	expect(!connect(tcp, (const struct sockaddr *) &((struct sockaddr_in) {
-	 .sin_family = AF_INET, .sin_port = htons(443), .sin_addr.s_addr = *(in_addr_t *) (gethostbyname(host)->h_addr)
+	 .sin_family = AF_INET, .sin_port = htons(DZR_PORT), .sin_addr.s_addr = *(in_addr_t *) (gethostbyname(host)->h_addr)
 	}), sizeof(struct sockaddr_in)));
 
 	SSL_CTX *ctx = SSL_CTX_new(SSLv23_client_method());
 	SSL *ssl = SSL_new(ctx);
 	SSL_set_fd(ssl, tcp);
 	expect(SSL_connect(ssl) != -1);
+
 	for (int i = 0; bodies && bodies[i]; i++)
 		len += strlen(bodies[i]);
 	char bodylen[9];
@@ -115,11 +115,10 @@ int fetch(char *meth, char *path, char *params, char *host, char **fields, char 
 			++pos;
 		out[pos + len] = '\0';//TODO : rework
 	}
-
 	SSL_shutdown(ssl);
 	SSL_free(ssl);
-	closesocket(tcp);
 	SSL_CTX_free(ctx);
+	closesocket(tcp);
 	return tcp;
 }
 int getTrackInfoFromAPI(char *api, char *trackid, char md5[32 + 1], char artist[64 + 1], char title[64 + 1]) {
@@ -137,7 +136,7 @@ int getTrackInfoFromAPI(char *api, char *trackid, char md5[32 + 1], char artist[
 	memcpy(md5, find(page, "PUID\":\""), 32);
 	memcpy(artist, find(page, "SNG_TITLE\":\""), 64);
 	memcpy(title, find(page, "ART_NAME\":\""), 64);
-	return 0;
+	return (int) strtol(find(page, "MEDIA_VERSION\":\""), NULL, 0);
 }
 int getTrackInfoFromSID(char *sid, char *trackid, char md5[32 + 1], char artist[64 + 1], char title[64 + 1]) {
 	char page[1024 * 32] = {};
@@ -170,22 +169,22 @@ int getTrackInfoFromLUT(char *lut, char *trackid, char md5[32 + 1]) {
 char *getTrackUrl(char *md5, int version, char *trackid, char *format, char url[160 + 1], AES_KEY*aes_key) {
 	char line[50] = {};
 	snprintf(line, sizeof(line), "%.32s\xA4%s\xA4%s\xA4%i", md5, format, trackid, version);
-	char *line_md5 = toHex(md5(line), 16, (char[32 + 48 + 1]) {}, "%02x");
+	char *line_md5 = toHex(MD5(line, strlen(line), (uint8_t[16]) {}), 16, (char[32 + 48 + 1]) {}, "%02x");
 	sprintf(line_md5 + 32, "\xA4%s\xA4%c%c%c", line, PKCS5(46, line), PKCS5(46, line), PKCS5(46, line));
 	unsigned char pth[80];
 	for (size_t i = 0; i < sizeof(pth); i += 16)
 		AES_ecb_encrypt((unsigned char *) line_md5 + i, pth + i, aes_key, AES_ENCRYPT);
-	return toHex(pth, sizeof(pth), url, "%02X");
+	return toHex((unsigned char *) line_md5, sizeof(pth), url, "%02X");
 }
 
 BF_KEY *getTrackKey(char *trackid, const char*bf, BF_KEY *bf_key) {
-	char *trackid_md5 = toHex(md5(trackid), 16, (char[32 + 1]) {}, "%02x");
+	char *trackid_md5 = toHex(MD5(trackid, strlen(trackid), (uint8_t[16]) {}), 16, (char[32 + 1]) {}, "%02x");
 	unsigned char xor[16];
 	for (size_t i = 0; i < sizeof(xor); i++)
 		xor[i] = (unsigned char) (bf[i] ^ trackid_md5[i] ^ trackid_md5[i + 16]);
 	BF_set_key(bf_key, sizeof(xor), xor);
 	return bf_key;
-	//char dbg[128]={};toHex(xor, dbg, sizeof(xor), "%02x");fprintf(stderr, "decrypting with: %s\n", dbg);
+	//fprintf(stderr, "decrypting with: %s\n", toHex(xor, sizeof(xor), (char[128]){}, "%02x"));
 }
 int decryptTrack(SSL* ssl, size_t mp3_size, void**args) {
 	BF_KEY *bf_key = args[0];
@@ -240,7 +239,7 @@ int main(int argc, char *argv[]) {
 			if (!strstr(track,"/track/")) {
 				fprintf(stderr, "only /track/ URL are supported (for now)... skip\n");continue;
 			}
-			for (; *track && !isdigit(*track); track++);//seek to {track,artist,album}id
+			for (; *track < '0' || *track > '9'; track++);//seek to {track,artist,album}id
 		} else if (strlen(track) >= 32 && track[32]==':') { // "MD5:trackid" format
 			memcpy(md5, track, sizeof(md5) - 1);
 			track += sizeof(md5);
