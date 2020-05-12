@@ -1,0 +1,17 @@
+name: dzr
+version: "git"
+summary: dzr
+description: Your favorite flows, straight from shell
+grade: stable
+base: core18
+confinement: strict
+parts:
+  dzr:
+    source: https://github.com/yne/dzr
+    source-type: git
+    plugin: make
+    build-packages: [gcc]
+    override-build: gcc dzr.c -o $SNAPCRAFT_PART_INSTALL/dzr
+apps:
+  dzr:
+    command: dzr
