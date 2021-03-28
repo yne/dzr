@@ -19,7 +19,8 @@ resolve(){
 
 	if [ "$TYPE" = bin ] ; then
 		IDX=$((($id-$START)/$STEP))
-		MD5=$(curl -sH Range:bytes=$((IDX*16))-$((IDX*16+15)) $SERVER/$DB | od -An -txC | tr -d ' ')
+		echo Range:bytes=$((IDX*16))-$((IDX*16+15)) $SERVER/$DB 
+		MD5=$(curl -vH Range:bytes=$((IDX*16))-$((IDX*16+15)) $SERVER/$DB | od -An -txC | tr -d ' ')
 	elif [ "$TYPE" = txt ] ; then
 		MD5=$(curl -s $SERVER/$DB | grep "^$id " | cut -f2 -d' ')
 	fi

@@ -1,45 +1,22 @@
-<img width=100% height=200 src=.logo.svg>
+<img width=100% height=200 src=".github/.logo.svg">
 <p align=center>Your favorite flows, straight from shell</p>
 
-> ⚠️ For legal reasons, `dzr` does not contain any private keys,
-> so [find them](https://github.com/yne/dzr/wiki) yourself.  
+> ⚠️ For legal reasons, this project does not provide the [decyption key](https://github.com/yne/dzr/wiki)  
 
 # Preview
 
-<p align=center><a href="https://asciinema.org/a/NpET2MMpGN41QW2a0JOjFru0l">
-<img height=200 src="https://asciinema.org/a/NpET2MMpGN41QW2a0JOjFru0l.svg">
-</a></p>
+[![](https://asciinema.org/a/NpET2MMpGN41QW2a0JOjFru0l.svg)](https://asciinema.org/a/NpET2MMpGN41QW2a0JOjFru0l)
 
-# Download
+# Requirement
 
-See [release](https://github.com/yne/dzr/releases) for the prebuild binary.
+- `apt install wget jq openssl`
+- Set the [decryption key](https://github.com/yne/dzr/wiki) `export DZR_CBC=g*******0zvf9na1` in your `.bashrc`/`.zshrc`/`.profile`
 
-# Build
-
-```bash
-cc dzr.c # HTTP only, work with DZR_API method
-```
-
-<details><summary>Build with HTTPS support via LibSSL</summary>
-
-```bash
-apt install gcc libssl1* libssl-dev
-gcc dzr.c -DUSE_SSL -lssl -lcrypto -o dzr
-```
-
-</details>
-
-# Setup
-
-Setup `dzr` environement variables using the
-[wiki](https://github.com/yne/dzr/wiki) in your `.bashrc`/`.zshrc`.
-
-# Usage
+# Usage Example (using curl + mpv)
 
 ```sh
-dzr 997764 > my.mp3
-dzr 997764 | mpv -
-DZR_FMT=9 dzr 997764 > my.flac
-dzr-api artist pink floyds | xargs dzr | mpv -
+# Note: DZR_CBC must be set for dzr-dec to work
+./dzr-url 5404528 664107 | while read url id; do curl -s "$url" | ./dzr-dec $id | mpv - ; done
 ```
 
+> You shall wrap the above line in a frontend `dzr` script (change mpv/curl if needed) so you would just have to type `dzr 5404528 664107` (see Preview)

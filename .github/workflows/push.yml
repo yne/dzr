@@ -7,29 +7,8 @@ on:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macOS-latest] # , windows-latest = The operation was canceled
-    env:
-      OS: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v1
-    - name: setup (win)
-      if: startsWith(matrix.os, 'windows')
-      run: |
-        choco install llvm
-        choco install openssl.light
-    - name: build
-      if: startsWith(matrix.os, 'mac')
-      run: |
-        cc dzr.c -Os -s -DUSE_SSL -L/usr/local/opt/openssl/lib -I/usr/local/opt/openssl/include -lssl -lcrypto -o dzr
-    - name: build
-      if: startsWith(matrix.os, 'ubuntu')
-      run: |
-        cc dzr.c -Os -s -DUSE_SSL -lssl -lcrypto -o dzr
-        sudo apt install musl*
-        musl-gcc -Os -s -static dzr.c -o dzr_static
     - name: publish
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,24 @@
+#!/bin/sh
+#TODO: avoid decode error (iflag=fullblock iflag=nocache iflag=sync conv=fsync) ?
+
+SNG_ID="$1"
+[ -z "$DZR_CBC" ] && echo "Missing 'DZR_CBC' env variable" 1>&2 && exit 1
+[ -z "$SNG_ID"  ] && echo "USAGE: DZR_CBC=XXXX dzr-dec 1234" 1>&2 && exit 1
+dzr_cbc_hex=$(printf "$DZR_CBC"                             | hexdump -e '16/1 "%02x"')
+track_md5_l=$(printf "$SNG_ID" | openssl md5 -r|cut -b1-16  | hexdump -e '16/1 "%02x"')
+track_md5_r=$(printf "$SNG_ID" | openssl md5 -r|cut -b17-32 | hexdump -e '16/1 "%02x"')
+track_key=$(for k in 1 3 5 7 9 11 13 15 17 19 21 23 25 27 29 31; do
+	a=$(printf $dzr_cbc_hex | cut -b $k-$(($k+1)))
+	b=$(printf $track_md5_l | cut -b $k-$(($k+1)))
+	c=$(printf $track_md5_r | cut -b $k-$(($k+1)))
+	printf '%02x' "$((0x$a ^ 0x$b ^ 0x$c))"
+done)
+
+stripe_size=2048
+
+# And now for my next loop, I'd like to return to the classics
+while true; do
+  dd bs=$stripe_size count=1 status=none | openssl bf-cbc -nopad -bufsize $stripe_size -K $track_key -iv 0001020304050607 -d 1>&4
+  { LC_ALL=POSIX dd bs=$stripe_size count=2 2>&3 >&4; } 3>&1 | grep -qe '^0[+]0 ' && break
+done 4>&1
+
