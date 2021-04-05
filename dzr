@@ -1,0 +1,43 @@
+#!/bin/sh
+API="api.deezer.com" # why anon has upload_token field ?
+
+DLG_LIST='dialog --keep-tite --output-fd 1 --menu choose: 0 0 0'
+DLG_TEXT="dialog --keep-tite --output-fd 1 --inputbox value: 0 0"
+FMT_LIST='.data[]|("/"+.type+"/"+(.id|tostring), .title+.name+" "+.artist.name)'
+FMT_TRKS='[.data[]|select(.type=="track")|.id]|@csv'
+
+dzr()          { $DLG_LIST /search/track?q= 'by name' /search/artist?q= 'by name' /search/album?q= 'by name' /search/playlist?q= 'by name' /search/user?q= 'by name' /genre 'list' /radio 'list' /user/0 'by id' /track/0 'by id' /artist/0 'by id' /album/0 'by id';}
+dzr_0()        { echo /track/$arg ;} # alias ./dzr 42 to ./dzr /track/42
+dzr_genre_0()  { wget -qO- "$API$1/0/artists"        | jq "$FMT_LIST" | xargs $DLG_LIST ;}
+fallback()     { wget -qO- "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST @ "play /track/" ;}
+play_all()     { wget -qO- "$API$1" | jq "$FMT_TRKS" | xargs $0 ; return 1;}
+dzr_radio()    { wget -qO- "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST top '' genres '' lists '' ;}
+dzr_radio_0()  { $DLG_LIST tracks '' fans '';}
+dzr_album_0()  { $DLG_LIST tracks '';}
+dzr_user_0()   { $DLG_LIST charts '' albums '' playlists '' flow '' tracks '' artists '' ;}
+dzr_artist_0() { $DLG_LIST top?limit=50 '' albums '' fans '' related '' radio '' playlists '' ;}
+dzr_track_0()  {
+	./dzr-url $(basename $arg) | while read url id; do
+		wget -qO- "$url" | ./dzr-dec $id | mpv -
+	done
+	return 1 # don't loop
+}
+
+for arg in "$@"; do
+	# convert argument (/search/artist?q=x) to shell function name (dzr_search_artist)
+	FUNC=$(echo "dzr_$arg" | sed 's@[,?].*@@' | sed "s@[^a-zA-Z0-9]\{1,\}@_@g" | sed "s@[0-9,]\{1,\}@0@g" | sed 's@_\{1,\}$@@')
+	type $FUNC>/dev/null || FUNC=fallback
+	case $arg in
+		*=)  arg="$arg$($DLG_TEXT '')" ;; # search query needed
+		*/0) arg="$arg$($DLG_TEXT '')" ;; # ressource id needed
+	esac
+	echo "$arg use $FUNC" >&2
+	while path=$($FUNC $arg); do
+		case $path in
+		@)  play_all $arg;;
+		/*) $0 "$path";;
+		*)  $0 "$arg/$path";;
+		esac
+	done
+done
+[ $# -eq 0 ] && $0 '' # give an argument to iterate over (if none given)
