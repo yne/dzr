@@ -17,9 +17,9 @@ done)
 stripe_size=2048
 
 # And now for my next loop, I'd like to return to the classics
-set -e; # if an iteration fail we stop the loop
+set -e; # if an iteration fail we stop the loop (you better pipe me with curl)
 while true; do
-    LC_ALL=POSIX dd bs=$stripe_size count=1 status=none | openssl bf-cbc -nopad -bufsize $stripe_size -K $track_key -iv 0001020304050607 -d 1>&4
-  { LC_ALL=POSIX dd bs=$stripe_size count=2 status=none 2>&3 >&4; } 3>&1 | grep -qe '^0[+]0 ' && break
+    LC_ALL=POSIX dd bs=$stripe_size count=1 status=none | openssl bf-cbc -nopad -bufsize $stripe_size -K $track_key -iv 0001020304050607 -d 2>/dev/null 1>&4
+  { LC_ALL=POSIX dd bs=$stripe_size count=2 2>&3 >&4; } 3>&1 | grep -qe '^0[+]0 ' && break
 done 4>&1
 
