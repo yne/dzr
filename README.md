@@ -1,22 +1,23 @@
-<img width=100% height=200 src=".github/.logo.svg">
-<p align=center>Your favorite flows, straight from shell</p>
+![dzr logo](.github/.logo.svg)
 
-> ⚠️ For legal reasons, this project does not provide the [decyption key](https://github.com/yne/dzr/wiki)  
+# DZR: Stream from SHell
+
+> ⚠️ For [legal reasons](https://github.com/github/dmca/blob/master/2021/02/2021-02-10-deezer.md), dzr does not come with any [track decryption key](https://github.com/yne/dzr/wiki) and so, does not work "out of the box"  
 
 # Preview
+[![asciicast](https://asciinema.org/a/406758.svg)](https://asciinema.org/a/406758)
 
-[![](https://asciinema.org/a/NpET2MMpGN41QW2a0JOjFru0l.svg)](https://asciinema.org/a/NpET2MMpGN41QW2a0JOjFru0l)
+# Install/Update
+- Find (or just google) the [DZR_CBC key](https://github.com/yne/dzr/wiki) then `export` it in your `~/.profile`
+- Install deps: `curl` `jq` `openssl` `dialog` `mpv` (package names may vary depending on your OS)
+- Install dzr: `rm -f dzr* && wget raw.githubusercontent.com/yne/dzr/master/dzr{,-dec,-url} && chmod +x ./dzr*`
 
-# Requirement
+> The Deezer API rapidly change so in case of breakage: update your dzr or open an issue
 
-- `apt install wget jq openssl`
-- Set the [decryption key](https://github.com/yne/dzr/wiki) `export DZR_CBC=g*******0zvf9na1` in your `.bashrc`/`.zshrc`/`.profile`
+# Compatibility
 
-# Usage Example (using curl + mpv)
-
-```sh
-# Note: DZR_CBC must be set for dzr-dec to work
-./dzr-url 5404528 664107 | while read url id; do curl -s "$url" | ./dzr-dec $id | mpv - ; done
-```
-
-> You shall wrap the above line in a frontend `dzr` script (change mpv/curl if needed) so you would just have to type `dzr 5404528 664107` (see Preview)
+This project shall work on any OS:
+- Linux
+- *BSD (even OpenBSD)
+- Android via [F-Droid Termux](https://termux.com/) (Note: `pkg install openssl-tool` instead of `openssl`)
+- Open an Issue/PR if you need more OS

@@ -1,13 +1,15 @@
 #!/bin/sh
+which jq curl dialog openssl mpv>/dev/null || { echo "please install: jq curl dialog openssl mpv" 1>&2 && exit 1 ;}
+[ $(printf "$DZR_CBC" | wc -m) -eq 16 ] || { echo -n "Missing/Bad DZR_CBC env variable:\necho 'export DZR_CBC=g*******0zvf9na1' > \$HOME/.profile\nand restart your shell\n" 1>&2 && exit 1 ;}
 API="api.deezer.com"
 DLG_LIST="dialog --keep-tite --output-fd 1 --menu $1: 0 0 0"
 DLG_TEXT="dialog --keep-tite --output-fd 1 --inputbox $1: 0 0"
 FMT_LIST='(if .data then .data else .tracks.data end)[]|("/"+.type+"/"+(.id|tostring), (.title+.name+" "+.artist.name|gsub("\\x22";"")))'
-dzr()          { $DLG_LIST /search/track?q= 'by name' /search/artist?q= 'by name' /search/album?q= 'by name' /search/playlist?q= 'by name' /search/user?q= 'by name' /genre 'list' /radio 'list' /user/0 'by id' /track/0 'by id' /artist/0 'by id' /album/0 'by id';}
+dzr()          { $DLG_LIST /search/track?q= 'by name' /search/artist?q= 'by name' /search/album?q= 'by name' /search/playlist?q= 'by name' /search/user?q= 'by name' /user/0 'by id' /track/0 'by id' /artist/0 'by id' /album/0 'by id';} # /genre 'list' /radio 'list' 
 dzr_default()  { curl -s   "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST @ "play all /track/" ;} # TODO: .next
-dzr_genre_0()  { curl -s   "$API$1/0/artists"        | jq "$FMT_LIST" | xargs $DLG_LIST ;}
-dzr_radio()    { curl -s   "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST top '' genres '' lists '' ;}
-dzr_radio_0()  { $DLG_LIST tracks '' fans '' ;}
+#dzr_genre_0()  { curl -s   "$API$1/0/artists"        | jq "$FMT_LIST" | xargs $DLG_LIST ;}
+#dzr_radio()    { curl -s   "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST top '' genres '' lists '' ;}
+#dzr_radio_0()  { $DLG_LIST tracks '' fans '' ;}
 dzr_album_0()  { $DLG_LIST tracks '' fans '' ;}
 dzr_user_0()   { $DLG_LIST charts '' albums '' playlists '' flow '' tracks '' artists '' ;}
 dzr_artist_0() { $DLG_LIST top?limit=50 '' albums '' fans '' related '' radio '' playlists '' ;}
@@ -21,7 +23,7 @@ for url in "$@"; do # convert argument (/search/artist?q=x) to shell function na
 		/track/*) echo $url | dzr_play; break ;;
 	esac
 	echo "$url use $FUNC" >&2
-	while path=$($FUNC $url); do # browse loop
+	while path=$($FUNC $url); do # browse REPL
 		case "$path" in
 		@) curl -s "$API$url" | jq '"/track/"+([.data[]|select(.type=="track")|.id]|@csv)' | dzr_play ; break ;;
 		/*) $0 "$path";;

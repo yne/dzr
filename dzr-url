@@ -6,21 +6,21 @@ SNG_IDS=$(printf "%s" "$*" | sed 's/ /,/g')
 
 gw () {
   method="$1"; session="$2" ;apiToken="$3" ; shift 3 # curl args ...
-  wget -qO- "https://www.deezer.com/ajax/gw-light.php?method=$method&input=3&api_version=1.0&api_token=$apiToken" --header="Cookie: sid=$session" "$@"
+  curl -s "https://www.deezer.com/ajax/gw-light.php?method=$method&input=3&api_version=1.0&api_token=$apiToken" --header "Cookie: sid=$session" "$@"
 }
 
 [ -z "$SNG_IDS" ] && echo "USAGE: dzr-url 5404528,664107" && exit 1
 DZR_URL="www.deezer.com/ajax/gw-light.php?method=deezer.ping&api_version=1.0&api_token"
-DZR_SID=$(wget -qO- "$DZR_URL" | jq -r .results.SESSION)
+DZR_SID=$(curl -s "$DZR_URL" | jq -r .results.SESSION)
 USR_NFO=$(gw deezer.getUserData "$DZR_SID" "$API_TOK")
 USR_TOK=$(printf "%s" "$USR_NFO" | jq -r .results.USER_TOKEN)
 USR_LIC=$(printf "%s" "$USR_NFO" | jq -r .results.USER.OPTIONS.license_token)
 API_TOK=$(printf "%s" "$USR_NFO" | jq -r .results.checkForm)
-printf "SID=$DZR_SID\nAPI=$API_TOK\nLIC=$USR_LIC\nTOK=$USR_TOK\nIDS=$SNG_IDS\n" 1>&2
+#printf "SID=$DZR_SID\nAPI=$API_TOK\nLIC=$USR_LIC\nTOK=$USR_TOK\nIDS=$SNG_IDS\n" 1>&2
 
-SNG_NFO=$(gw song.getListData "$DZR_SID" "$API_TOK" --post-data="{\"sng_ids\":[$SNG_IDS]}")
+SNG_NFO=$(gw song.getListData "$DZR_SID" "$API_TOK" --data "{\"sng_ids\":[$SNG_IDS]}")
 SNG_TOK=$(printf "%s" "$SNG_NFO" | jq [.results.data[].TRACK_TOKEN])
-URL_NFO=$(wget -qO- 'https://media.deezer.com/v1/get_url' --post-data="{\"license_token\":\"$USR_LIC\",\"media\":[{\"type\":\"FULL\",\"formats\":[{\"cipher\":\"BF_CBC_STRIPE\",\"format\":\"MP3_128\"}]}],\"track_tokens\":$SNG_TOK}")
+URL_NFO=$(curl -s 'https://media.deezer.com/v1/get_url' --data "{\"license_token\":\"$USR_LIC\",\"media\":[{\"type\":\"FULL\",\"formats\":[{\"cipher\":\"BF_CBC_STRIPE\",\"format\":\"MP3_128\"}]}],\"track_tokens\":$SNG_TOK}")
 URL_SRC=$(printf "%s" "$URL_NFO" | jq -r .data[].media[].sources[0].url)
 
 i=0
