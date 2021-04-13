@@ -5,27 +5,33 @@ API="api.deezer.com"
 DLG_LIST="dialog --keep-tite --output-fd 1 --menu $1: 0 0 0"
 DLG_TEXT="dialog --keep-tite --output-fd 1 --inputbox $1: 0 0"
 FMT_LIST='(if .data then .data else .tracks.data end)[]|("/"+.type+"/"+(.id|tostring), (.title+.name+" "+.artist.name|gsub("\\x22";"")))'
-dzr()          { $DLG_LIST /search/track?q= 'by name' /search/artist?q= 'by name' /search/album?q= 'by name' /search/playlist?q= 'by name' /search/user?q= 'by name' /user/0 'by id' /track/0 'by id' /artist/0 'by id' /album/0 'by id';} # /genre 'list' /radio 'list' 
-dzr_default()  { curl -s   "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST @ "play all /track/" ;} # TODO: .next
-#dzr_genre_0()  { curl -s   "$API$1/0/artists"        | jq "$FMT_LIST" | xargs $DLG_LIST ;}
-#dzr_radio()    { curl -s   "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST top '' genres '' lists '' ;}
-#dzr_radio_0()  { $DLG_LIST tracks '' fans '' ;}
+FMT_TRKS='"/track/"+([.data[]|select(.type=="track")|.id]|@csv)'
+FMT_FUNC='s@[,?].*@@;s@[^a-zA-Z0-9]\{1,\}@_@g;s@[0-9,]\{1,\}@0@g;s@_\{1,\}$@@'
+
+dzr()          { $DLG_LIST /search/track?q= 'by name' /search/artist?q= 'by name' /search/album?q= 'by name' /search/playlist?q= 'by name' /search/user?q= 'by name' /search/radio?q= 'by name' /genre 'list' /radio 'list' ;} 
+dzr_genre_0()  { $DLG_LIST radios '' artists '' ;}
+dzr_radio_0()  { $DLG_LIST tracks '' fans '' ;}
 dzr_album_0()  { $DLG_LIST tracks '' fans '' ;}
 dzr_user_0()   { $DLG_LIST charts '' albums '' playlists '' flow '' tracks '' artists '' ;}
 dzr_artist_0() { $DLG_LIST top?limit=50 '' albums '' fans '' related '' radio '' playlists '' ;}
-dzr_play() { xargs basename | xargs ./dzr-url | while read url id; do curl -s "$url" | ./dzr-dec $id | mpv - ; done ; }
-for url in "$@"; do # convert argument (/search/artist?q=x) to shell function name (dzr_search_artist)
-	FUNC=$(echo "dzr_$url" | sed 's@[,?].*@@' | sed "s@[^a-zA-Z0-9]\{1,\}@_@g" | sed "s@[0-9,]\{1,\}@0@g" | sed 's@_\{1,\}$@@')
+dzr_default()  { curl -s -H "Accept-Language: $LANG" "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST @ "play all /track/" ;} # TODO: .next
+play() { # receive /track/1,2,3 from stdin
+	xargs basename | xargs ./dzr-url | while read url id; do
+		curl -s "$url" | ./dzr-dec $id | mpv - ;
+	done
+}
+for url in "$@"; do
+	FUNC=$(echo "dzr_$url" | sed "$FMT_FUNC") # path (/search/artist?q=x) to function (dzr_search_artist)
 	type $FUNC>/dev/null || FUNC=dzr_default
-	case $url in # catch url that need user input (query, id) or action (/artist/21?_=playall => /track/15,52,35)
-		*=)  url="$url$($DLG_TEXT ''|jq -rR '.|@uri')" ;; # search query needed + escape
-		*/0) url="$url$($DLG_TEXT ''|jq -rR '.|@uri')" ;; # ressource id needed + escape
-		/track/*) echo $url | dzr_play; break ;;
+	case $url in # catch url that need user input (query, id)
+		*=)  url="$url$($DLG_TEXT ''|jq -rR '.|@uri')" ;; # escaped query
+		*/0) url="$url$($DLG_TEXT ''|jq -rR '.|@uri')" ;; # escaped id
+		/track/*) echo $url | play; break ;;
 	esac
-	echo "$url use $FUNC" >&2
+	echo "$0 $url # call $FUNC" >&2
 	while path=$($FUNC $url); do # browse REPL
 		case "$path" in
-		@) curl -s "$API$url" | jq '"/track/"+([.data[]|select(.type=="track")|.id]|@csv)' | dzr_play ; break ;;
+		@) curl -s "$API$url" | jq "$FMT_TRKS" | play ; break ;;
 		/*) $0 "$path";;
 		*)  $0 "$url/$path";;
 		esac

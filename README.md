@@ -1,6 +1,6 @@
 ![dzr logo](.github/.logo.svg)
 
-# DZR: Stream from SHell
+# DZR: Deezer from shell
 
 > ⚠️ For [legal reasons](https://github.com/github/dmca/blob/master/2021/02/2021-02-10-deezer.md), dzr does not come with any [track decryption key](https://github.com/yne/dzr/wiki) and so, does not work "out of the box"  
 
@@ -16,8 +16,6 @@
 
 # Compatibility
 
-This project shall work on any OS:
-- Linux
-- *BSD (even OpenBSD)
-- Android via [F-Droid Termux](https://termux.com/) (Note: `pkg install openssl-tool` instead of `openssl`)
-- Open an Issue/PR if you need more OS
+This project shall work on Linux, *BSD and Android (via [F-Droid Termux](https://termux.com/) but use `pkg install openssl-tool` instead of `openssl`)
+
+Open an Issue if you need more OS (beside MacOS/Windows which I don't have/own)
