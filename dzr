@@ -5,7 +5,7 @@ API="api.deezer.com"
 DLG_LIST="dialog --keep-tite --output-fd 1 --menu $1: 0 0 0"
 DLG_TEXT="dialog --keep-tite --output-fd 1 --inputbox $1: 0 0"
 FMT_LIST='(if .data then .data else .tracks.data end)[]|("/"+.type+"/"+(.id|tostring), (.title+.name+" "+.artist.name|gsub("\\x22";"")))'
-FMT_TRKS='"/track/"+([.data[]|select(.type=="track")|.id]|@csv)'
+FMT_TRKS='"/track/"+([(if .data then .data else .tracks.data end)[]|select(.type=="track")|.id]|@csv)'
 FMT_FUNC='s@[,?].*@@;s@[^a-zA-Z0-9]\{1,\}@_@g;s@[0-9,]\{1,\}@0@g;s@_\{1,\}$@@'
 
 dzr()          { $DLG_LIST /search/track?q= 'by name' /search/artist?q= 'by name' /search/album?q= 'by name' /search/playlist?q= 'by name' /search/user?q= 'by name' /search/radio?q= 'by name' /genre 'list' /radio 'list' ;} 
@@ -31,7 +31,7 @@ for url in "$@"; do
 	echo "$0 $url # call $FUNC" >&2
 	while path=$($FUNC $url); do # browse REPL
 		case "$path" in
-		@) curl -s "$API$url" | jq "$FMT_TRKS" | play ; break ;;
+		@) echo "$API$url"; curl -s "$API$url" | jq "$FMT_TRKS" | play ; break ;;
 		/*) $0 "$path";;
 		*)  $0 "$url/$path";;
 		esac

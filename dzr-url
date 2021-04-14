@@ -1,6 +1,6 @@
 #!/bin/sh
-
-# ./dzr-url 355777961 650744592 | while read url id; do echo curl "$url" ./dzr-dec $id mpv - ; done
+# USAGE Example:
+# ./dzr-url 355777961 650744592 | while read url id; do curl -s "$url" | ./dzr-dec $id | mpv - ; done
 
 SNG_IDS=$(printf "%s" "$*" | sed 's/ /,/g')
 
@@ -16,15 +16,13 @@ USR_NFO=$(gw deezer.getUserData "$DZR_SID" "$API_TOK")
 USR_TOK=$(printf "%s" "$USR_NFO" | jq -r .results.USER_TOKEN)
 USR_LIC=$(printf "%s" "$USR_NFO" | jq -r .results.USER.OPTIONS.license_token)
 API_TOK=$(printf "%s" "$USR_NFO" | jq -r .results.checkForm)
-#printf "SID=$DZR_SID\nAPI=$API_TOK\nLIC=$USR_LIC\nTOK=$USR_TOK\nIDS=$SNG_IDS\n" 1>&2
+printf "SID=$DZR_SID\nAPI=$API_TOK\nLIC=$USR_LIC\nTOK=$USR_TOK\nIDS=$SNG_IDS\n" 1>&2
 
 SNG_NFO=$(gw song.getListData "$DZR_SID" "$API_TOK" --data "{\"sng_ids\":[$SNG_IDS]}")
 SNG_TOK=$(printf "%s" "$SNG_NFO" | jq [.results.data[].TRACK_TOKEN])
+# reset to resolvable id, eg:no personal uploads (geoblocked track will fail later)
+SNG_IDS=$(printf "%s" "$SNG_NFO" | jq [.results.data[].SNG_ID])
 URL_NFO=$(curl -s 'https://media.deezer.com/v1/get_url' --data "{\"license_token\":\"$USR_LIC\",\"media\":[{\"type\":\"FULL\",\"formats\":[{\"cipher\":\"BF_CBC_STRIPE\",\"format\":\"MP3_128\"}]}],\"track_tokens\":$SNG_TOK}")
-URL_SRC=$(printf "%s" "$URL_NFO" | jq -r .data[].media[].sources[0].url)
-
-i=0
-for src in $URL_SRC ; do
-  echo "$src" $(jq -n "[$SNG_IDS] | .[$i]")
-  i=$((i+1))
-done
+URL_IDS=$(printf "%s" "$URL_NFO" | jq --argjson ids "$SNG_IDS" '[.data , ($ids|map({id:.}))]|transpose|map(add)')
+printf "%s" "$URL_IDS" | jq -r '.[]|select(.errors)|[.errors[0].message     ,.id]|@tsv' 1>&2
+printf "%s" "$URL_IDS" | jq -r '.[]|select(.media )|[.media[].sources[0].url,.id]|@tsv'
