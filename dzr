@@ -17,7 +17,7 @@ dzr_artist_0() { $DLG_LIST top?limit=50 '' albums '' fans '' related '' radio ''
 dzr_default()  { curl -s -H "Accept-Language: $LANG" "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST @ "play all /track/" ;} # TODO: .next
 play() { # receive /track/1,2,3 from stdin
 	xargs basename | xargs ./dzr-url | while read url id; do
-		curl -s "$url" | ./dzr-dec $id | mpv - ;
+		curl -s "$url" | $0-dec $id | eval ${PLAYER:-'mpv -'} ;
 	done
 }
 for url in "$@"; do
