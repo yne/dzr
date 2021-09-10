@@ -10,13 +10,9 @@
 [![asciicast](https://asciinema.org/a/406758.svg)](https://asciinema.org/a/406758)
 
 # Install
-- Find (or just lookup) the [DZR_CBC key](https://github.com/yne/dzr/wiki) then `export` it in your `~/.profile` (don't forget to `source` it or to reload your session)
+- Find and save the [DZR_CBC key](https://github.com/yne/dzr/wiki)
 - Install dependencies: `curl` `jq` `dialog` `mpv` `openssl` (or `openssl-tool` in Android)
-- Installation choices:
-  - `git clone https://github.com/yne/dzr` (then `git pull` to update)
-  - `curl -sL github.com/yne/dzr/archive/master.tar.gz | tar xzf -`
-  - `rm -f dzr* && wget raw.githubusercontent.com/yne/dzr/master/dzr{,-dec,-url} && chmod +x ./dzr*`
-  - `for i in dzr{,-dec,-url}; do curl -so $i https://raw.githubusercontent.com/yne/dzr/master/$i; chmod +x $i; done`
+- Install dzr itself: `curl -sL github.com/yne/dzr/archive/master.tar.gz | tar xzf -` (this command will save dzr into a `dzr-master` folder)
 
 > The Deezer API rapidly change, so update `dzr` when something goes wrong
 
