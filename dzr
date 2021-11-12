@@ -1,6 +1,13 @@
 #!/bin/sh
 which jq curl dialog openssl mpv>/dev/null || { echo "please install: jq curl dialog openssl mpv" 1>&2 && exit 1 ;}
-[ $(printf "$DZR_CBC" | wc -m) -eq 16 ] || { echo -n "Missing/Bad DZR_CBC env variable:\necho 'export DZR_CBC=g*******0zvf9na1' > \$HOME/.profile\nand restart your shell\n" 1>&2 && exit 1 ;}
+unscramble(){ printf "${8}${16}${7}${15}${6}${14}${5}${13}${4}${12}${3}${11}${2}${10}${1}${9}";}
+if [ -z "$DZR_CBC" ]; then # extraction by charleywright, see: https://github.com/yne/dzr/issues/11
+	echo "WARNING: unset DZR_CBC variable !\nextracting from web-player..."
+	APP_WEB=$(curl -sL deezer.com/en/channels/explore | grep -Po "(?<=(script src=\"))https:\/\/[a-z-\.\/]+app-web[a-z0-9\.]+" | xargs curl -sL)
+	TMP_CBC=$(echo "$APP_WEB"  | grep -Po "%5B(0x31|0x61)(%2C0x[0-9a-f]{2}){7}%5D" |  sed 's/%5[BD]//g;s/%/\\x/g' | xargs -0 printf %b | sed 's/0x/\\x/g;s/,/\n/g' | xargs -0 printf %b)
+	DZR_CBC=$(unscramble $TMP_CBC);
+	echo "export DZR_CBC="$DZR_CBC" in your .profile to avoid this warning"
+fi
 API="api.deezer.com"
 DLG_LIST="dialog --keep-tite --output-fd 1 --menu $1: 0 0 0"
 DLG_TEXT="dialog --keep-tite --output-fd 1 --inputbox $1: 0 0"
