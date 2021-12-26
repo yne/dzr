@@ -1,12 +1,17 @@
 #!/bin/sh
-which jq curl dialog openssl mpv>/dev/null || { echo "please install: jq curl dialog openssl mpv" 1>&2 && exit 1 ;}
+# dependencies check, see: https://github.com/yne/dzr/issues/12
+for c in jq curl dialog openssl mpv; do
+	command -v $c >/dev/null || { echo "$c is required" 1>&2 && exit 1 ;}
+done
 unscramble(){ printf "${8}${16}${7}${15}${6}${14}${5}${13}${4}${12}${3}${11}${2}${10}${1}${9}";}
-if [ -z "$DZR_CBC" ]; then # extraction by charleywright, see: https://github.com/yne/dzr/issues/11
-	echo "WARNING: unset DZR_CBC variable !\nextracting from web-player..."
+# extraction + warning by charleywright, see: https://github.com/yne/dzr/issues/11
+if [ -z "$DZR_CBC" ]; then
+	echo -e "WARNING:\nDZR_CBC variable is unset\nextracting from web-player..."
 	APP_WEB=$(curl -sL deezer.com/en/channels/explore | grep -Po "(?<=(script src=\"))https:\/\/[a-z-\.\/]+app-web[a-z0-9\.]+" | xargs curl -sL)
-	TMP_CBC=$(echo "$APP_WEB"  | grep -Po "%5B(0x31|0x61)(%2C0x[0-9a-f]{2}){7}%5D" |  sed 's/%5[BD]//g;s/%/\\x/g' | xargs -0 printf %b | sed 's/0x/\\x/g;s/,/\n/g' | xargs -0 printf %b)
+	TMP_CBC=$(echo "$APP_WEB" | grep -Po "%5B(0x31|0x61)(%2C0x[0-9a-f]{2}){7}%5D" |  sed 's/%5[BD]//g;s/%/\\x/g' | xargs -0 printf %b | sed 's/0x/\\x/g;s/,/\n/g' | xargs -0 printf %b)
 	export DZR_CBC=$(unscramble $TMP_CBC);
-	echo "export DZR_CBC="$DZR_CBC" in your .profile to avoid this warning"
+	echo -e "    echo \"export DZR_CBC="$DZR_CBC"\" >> .profile\nto avoid this warning"
+	sleep 2 # give time to read the warning
 fi
 API="api.deezer.com"
 DLG_LIST="dialog --keep-tite --output-fd 1 --menu $1: 0 0 0"
@@ -29,13 +34,13 @@ play() { # receive /track/1,2,3 from stdin
 }
 for url in "$@"; do
 	FUNC=$(echo "dzr_$url" | sed "$FMT_FUNC") # path (/search/artist?q=x) to function (dzr_search_artist)
-	type $FUNC>/dev/null || FUNC=dzr_default
+	type $FUNC 1>/dev/null 2>/dev/null || FUNC=dzr_default
 	case $url in # catch url that need user input (query, id)
 		*=)  url="$url$($DLG_TEXT ''|jq -rR '.|@uri')" ;; # escaped query
 		*/0) url="$url$($DLG_TEXT ''|jq -rR '.|@uri')" ;; # escaped id
 		/track/*) echo $url | play; break ;;
 	esac
-	echo "$0 $url # call $FUNC" >&2
+	echo "$0 $url" >&2
 	while path=$($FUNC $url); do # browse REPL
 		case "$path" in
 		@) echo "$API$url"; curl -s "$API$url" | jq "$FMT_TRKS" | play ; break ;;
