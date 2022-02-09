@@ -20,7 +20,7 @@ FMT_LIST='(if .data then .data else .tracks.data end)[]|("/"+.type+"/"+(.id|tost
 FMT_TRKS='"/track/"+([(if .data then .data else .tracks.data end)[]|select(.type=="track")|.id]|@csv)'
 FMT_FUNC='s@[,?].*@@;s@[^a-zA-Z0-9]\{1,\}@_@g;s@[0-9,]\{1,\}@0@g;s@_\{1,\}$@@'
 
-dzr()          { $DLG_LIST /search/track?q= 'by name' /search/artist?q= 'by name' /search/album?q= 'by name' /search/playlist?q= 'by name' /search/user?q= 'by name' /search/radio?q= 'by name' /genre 'list' /radio 'list' ;} 
+dzr()          { $DLG_LIST /search/track?q= 'by name' /search/artist?q= 'by name' /search/album?q= 'by name' /search/playlist?q= 'by name' /search/user?q= 'by name' /search/radio?q= 'by name' /genre 'list' /radio 'list' /user/0 'by id' ;} 
 dzr_genre_0()  { $DLG_LIST radios '' artists '' ;}
 dzr_radio_0()  { $DLG_LIST tracks '' fans '' ;}
 dzr_album_0()  { $DLG_LIST tracks '' fans '' ;}
