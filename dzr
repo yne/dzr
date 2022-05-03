@@ -1,9 +1,19 @@
 #!/bin/sh
 # dependencies check, see: https://github.com/yne/dzr/issues/12
+FETCH=${FETCH:-curl -s} # FETCH="wget -q -O -" or FETCH="curl -s -k"
+# handle CGI call, for example moving ./dzr* bin to ~/cgi-bin and running :
+#     python3 -m http.server --cgi
+# from your ~ (as non-root !) will reply to http://0.0.0.0:8000/cgi-bin/dzr?6113114,806027
+if [ ! -z "$QUERY_STRING" ] ; then
+	printf "content-type: audio/mpeg\n\n"
+	echo "$QUERY_STRING" | xargs basename | xargs $0-url | while read url id; do
+		$FETCH "$url" | $0-dec $id
+	done
+	exit
+fi
 for c in jq curl dialog openssl mpv; do
 	command -v $c >/dev/null || { echo "$c is required" 1>&2 && exit 1 ;}
 done
-FETCH=${FETCH:-curl -s} # FETCH="wget -q -O -" or FETCH="curl -s -k"
 unscramble(){ printf "${8}${16}${7}${15}${6}${14}${5}${13}${4}${12}${3}${11}${2}${10}${1}${9}";}
 # extraction + warning by charleywright, see: https://github.com/yne/dzr/issues/11
 if [ -z "$DZR_CBC" ]; then

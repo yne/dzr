@@ -3,7 +3,7 @@
 # DZR: the command line deezer.com player
 
 > ⚠️ For [legal reasons](https://github.com/github/dmca/blob/master/2021/02/2021-02-10-deezer.md) this project
-> - does not contain the [track decryption key](https://github.com/yne/dzr/wiki)
+> - does not contain any track decryption key
 > - does not cache any tracks on your machine
 
 ## Preview
@@ -34,6 +34,35 @@ curl -sL github.com/yne/dzr/archive/master.tar.gz | tar xzf -
 ```
 
 Optional: move all `dzr*` scripts in a `*/bin` folder of your `$PATH` so you can just type `dzr` to use it.
+
+## Usage
+
+Run `dzr` without argument to get to the home screen
+
+```sh
+dzr
+```
+
+### From URL
+
+Run `dzr` with a valid url, to browse this artist, album, playlist, track.
+
+Example: `deezer.com/en/artist/860` become `dzr /artist/860`
+
+### As CGI
+
+`dzr` can serve tracks over HTTP when running as [CGI](https://en.wikipedia.org/wiki/Common_Gateway_Interface)
+
+```sh
+# create a cgi-bin directory
+mkdir cgi-bin
+# copy all your dzr* executables into this directory
+cp /path/to/your/dzr* cgi-bin
+# run a basic HTTP server with CGI support
+python3 -m http.server --cgi
+# you shall now be able to play from HTTP
+mpv http://0.0.0.0:8000/cgi-bin/dzr?6113114
+```
 
 ## Compatibility
 
