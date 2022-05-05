@@ -25,6 +25,12 @@
 yay -S dzr
 ```
 
+### From [GURU](https://github.com/gentoo/guru) (Gentoo)
+
+```sh
+emerge --ask dzr
+```
+
 ### Manually
 
 Save into a `dzr-master` folder :
