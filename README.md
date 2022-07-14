@@ -31,44 +31,30 @@ yay -S dzr
 emerge --ask dzr
 ```
 
-### Manually
+### From TAR file
 
 Save into a `dzr-master` folder :
 
 ```bash
 curl -sL github.com/yne/dzr/archive/master.tar.gz | tar xzf -
+sudo mv dzr-master/dzr* /usr/local/bin
 ```
 
-Optional: move all `dzr*` scripts in a `*/bin` folder of your `$PATH` so you can just type `dzr` to use it.
-
-## Usage
-
-Run `dzr` without argument to get to the home screen
+## Usage Examples
 
 ```sh
-dzr
+dzr             # welcome screen
+dzr /artist/860 # browse deezer.com/en/artist/860
 ```
 
-### From URL
-
-Run `dzr` with a valid url, to browse this artist, album, playlist, track.
-
-Example: `deezer.com/en/artist/860` become `dzr /artist/860`
-
-### As CGI
-
-`dzr` can serve tracks over HTTP when running as [CGI](https://en.wikipedia.org/wiki/Common_Gateway_Interface)
+## Usage as HTTP server
 
 ```sh
-# create a cgi-bin directory
-mkdir cgi-bin
-# copy all your dzr* executables into this directory
-cp /path/to/your/dzr* cgi-bin
-# run a basic HTTP server with CGI support
+mkdir -p cgi-bin && cp dzr* ./cgi-bin/
 python3 -m http.server --cgi
-# you shall now be able to play from HTTP
-mpv http://0.0.0.0:8000/cgi-bin/dzr?6113114
 ```
+
+You shall then be able to play from http : http://0.0.0.0:8000/cgi-bin/dzr?6113114
 
 ## Compatibility
 
@@ -76,5 +62,6 @@ This project has been tested on:
 - Linux (Ubuntu 18.04/20.04 but other distrib shall work)
 - OpenBSD (But any BSD shall work)
 - Android (using [Termux](https://termux.com/) from F-droid)
+- Window 10 using WSL 1/2 and running dzr as CGI server then browsing http://127.0.0.1:8000 from windows
 
 Need more OS support ? Open an issue or a pull request.

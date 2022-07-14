@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang=en>
+<meta name="viewport" content="width=device-width, user-scalable=no">
+<script type=module>
+const el = (tag, props={}, ch=[]) => ch.reduce((e,c) => (e.appendChild(c),e),Object.assign(document.createElement(tag),props))
+const api = (path, callback=`cb_${+new Date()}`) => new Promise(function(ok, ko) {
+	window[callback] = (data) => {delete window[callback]; data?.error?ko(data.error):ok(data)};
+	const src = new URL(`https://api.deezer.com/${path}`);
+	src.searchParams.append('output','jsonp');
+	src.searchParams.append('callback',callback);
+	document.head.append(el('script', { src, onload:({target})=>target.parentNode.removeChild(target)}));
+});
+const rel = (h) => h.startsWith('/') ? h : `${location.hash.slice(1)}/${h}`
+const list = (tags) => document.forms.results.replaceChildren(...tags.map(([tag, props]) => el(tag, {innerText:props?.href, ...props, href:`#${rel(props.href)}`})))
+const toLink = (...links) => links.map(href => ['a', {href}])
+const routes = {
+	'' :     (_) => list(toLink('/search/track?q=','/search/artist?q=','/search/album?q=','/search/playlist?q=','/search/radio?q=','/search/user?q=','/user/0','/genre','/radio')),
+	genre_0: (_) => list(toLink('radios','artists')),
+	radio_0: (_) => list(toLink('tracks', 'fans')),
+	album_0: (_) => list(toLink('tracks', 'fans')),
+	user_0:  (_) => list(toLink('charts','albums','playlist','flow','tracks','artists')),
+	artist_0:(_) => list(toLink('top?limit=50','albums','fans','related','radio','playlist')),
+	default: async (h) => list( (await api(h)).data.map(d => ['a', {
+		href:`/${d.type}/${d.id}`,
+		innerText: `${d.title||d.name} ${d.artist?.name||''}`
+	}]) )
+};
+(window.onhashchange = function(event) {
+	const h = location.hash.replace(/#?\/?/,'');
+	if (h.endsWith('=')||h.endsWith('/0'))
+		return location.hash += prompt(`query for ${h}`);
+	if (h.startsWith('track')){
+		window.player.src = `${window.cgi.value}?`+(new URL(event.newURL)).hash.match(/\d+/);
+		return location.hash = (new URL(event.oldURL)).hash; // don't change URL
+	}
+	const route = h.replace(/[,?].*/,'').replace(/[^a-zA-Z0-9]+/g,'_').replace(/[0-9,]+/g,'0').replace(/_+/g,'_');
+	(routes[route]||routes.default)(h);
+})({newURL:`${location}`,oldURL:`${location}`});
+</script>
+<body style="margin-bottom:100px;font-size:2em;font-family:monospace">
+	<details>
+		<summary>Options</summary>
+		<input id="cgi" value="/cgi-bin/dzr" placeholder="cgi-bin url of dzr (ex: http://127.0.0.1:8000/cgi-bin/dzr)">
+	</details>
+	<form name=results style="display: grid"></form>
+	<audio id="player" ondurationchange=play() onload=play() controls style="position:fixed;bottom:0;left:0;width:100%"></audio>
+</body>
