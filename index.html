@@ -2,6 +2,7 @@
 <html lang=en>
 <meta name="viewport" content="width=device-width, user-scalable=no">
 <script type=module>
+const $$ = document.querySelectorAll.bind(document);
 const el = (tag, props={}, ch=[]) => ch.reduce((e,c) => (e.appendChild(c),e),Object.assign(document.createElement(tag),props))
 const api = (path, callback=`cb_${+new Date()}`) => new Promise(function(ok, ko) {
 	window[callback] = (data) => {delete window[callback]; data?.error?ko(data.error):ok(data)};
@@ -25,23 +26,44 @@ const routes = {
 		innerText: `${d.title||d.name} ${d.artist?.name||''}`
 	}]) )
 };
-(window.onhashchange = function(event) {
-	const h = location.hash.replace(/#?\/?/,'');
-	if (h.endsWith('=')||h.endsWith('/0'))
-		return location.hash += prompt(`query for ${h}`);
-	if (h.startsWith('track')){
-		window.player.src = `${window.cgi.value}?`+(new URL(event.newURL)).hash.match(/\d+/);
-		return location.hash = (new URL(event.oldURL)).hash; // don't change URL
+const modes = {
+	none: (p) => {},
+	replay: (p) => p.play(),
+	random: (p) => window.onhashchange({newURL:$$('a[href^="#/track/"]')[0].href}),
+	next: (p) => window.onhashchange({newURL:$$(`a[href="${p.dataset.href}"]`)[0].nextElementSibling.href}),
+}
+window.onhashchange = function(event) {
+	const newurl = new URL(event.newURL);
+	const path = newurl.hash.replace(/#?\/?/,'');
+	if (path.endsWith('=')||path.endsWith('/0'))
+	return location.hash += prompt(`query for ${path}`);
+	if (path.startsWith('track')){
+		if(!window.cgi.value) return alert('No dzr cgi url detected! (is dzr running as cgi ?)\nplease manually set it up in options');
+		window.player.src = `${window.cgi.value}?`+newurl.hash.match(/\d+/);
+		window.player.dataset.href = newurl.hash; // to find it back in next track
+		window.document.title = path;
+		return location.hash = (new URL(event.oldURL||location)).hash; // don't change URL
 	}
-	const route = h.replace(/[,?].*/,'').replace(/[^a-zA-Z0-9]+/g,'_').replace(/[0-9,]+/g,'0').replace(/_+/g,'_');
-	(routes[route]||routes.default)(h);
-})({newURL:`${location}`,oldURL:`${location}`});
+	const route = path.replace(/[,?].*/,'').replace(/[^a-zA-Z0-9]+/g,'_').replace(/[0-9,]+/g,'0').replace(/_+/g,'_');
+	(routes[route]||routes.default)(path);
+}
+window.onload = function() {
+	window.player.onended = ()=>modes[window.mode.value](window.player);
+	window.https.hidden = location.protocol=='http:';
+	if (localStorage.dzr_mode) window.mode.value = localStorage.dzr_mode;
+	if (localStorage.dzr_cgi) window.cgi.value = localStorage.dzr_cgi;
+	else ['/cgi-bin/dzr', '//0.0.0.0:8000/cgi-bin/dzr', '//127.0.0.1:8000/cgi-bin/dzr', '//localhost:8000/cgi-bin/dzr']
+	     .forEach(url => fetch(url,{method:'HEAD'}).then(e=>e.ok ? window.cgi.value = localStorage.dzr_cgi = url:0))
+	window.onhashchange({newURL:`${location}`});
+}
 </script>
 <body style="margin-bottom:100px;font-size:2em;font-family:monospace">
-	<details>
+	<cite id=https>Warning: dzr don't normaly use https, please downgrade to http://</cite>
+	<details style="display: grid">
 		<summary>Options</summary>
-		<input id="cgi" value="/cgi-bin/dzr" placeholder="cgi-bin url of dzr (ex: http://127.0.0.1:8000/cgi-bin/dzr)">
+		<label>dzr cgi url: <input id="cgi" placeholder="http://example:8000/cgi-bin/dzr"></label>
+		<label>next track: <select id="mode" onchange="localStorage.dzr_mode=value"><option>none<option>replay<option>random<option>next</select></label>
 	</details>
 	<form name=results style="display: grid"></form>
-	<audio id="player" ondurationchange=play() onload=play() controls style="position:fixed;bottom:0;left:0;width:100%"></audio>
+	<audio id="player" autoplay controls style="position:fixed;bottom:0;left:0;width:100%"></audio>
 </body>

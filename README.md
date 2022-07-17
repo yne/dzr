@@ -54,14 +54,17 @@ mkdir -p cgi-bin && cp dzr* ./cgi-bin/
 python3 -m http.server --cgi
 ```
 
-You shall then be able to play from http : http://0.0.0.0:8000/cgi-bin/dzr?6113114
+You shall then be able to play any track over HTTP (ex: http://127.0.0.1:8000/cgi-bin/dzr?6113114 )
+
+A **basic** web interface is also available on http://127.0.0.1:8000
+
+Feel free to create your own frontend an publish it as a new repository (not as a dzr fork) with the [dzr](https://github.com/topics/dzr) tag.
+
 
 ## Compatibility
 
 This project has been tested on:
-- Linux (Ubuntu 18.04/20.04 but other distrib shall work)
-- OpenBSD (But any BSD shall work)
+- Linux
+- *BSD
 - Android (using [Termux](https://termux.com/) from F-droid)
-- Window 10 using WSL 1/2 and running dzr as CGI server then browsing http://127.0.0.1:8000 from windows
-
-Need more OS support ? Open an issue or a pull request.
+- Window 10 (running dzr as CGI server from WSL and browsing http://127.0.0.1:8000 from Windows)
