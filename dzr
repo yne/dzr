@@ -4,9 +4,9 @@ FETCH=${FETCH:-curl -s} # FETCH="wget -q -O -" or FETCH="curl -s -k"
 # handle CGI call, for example moving ./dzr* bin to ~/cgi-bin and running :
 #     python3 -m http.server --cgi
 # from your ~ (as non-root !) will reply to http://0.0.0.0:8000/cgi-bin/dzr?6113114,806027
-if [ "$REQUEST_METHOD" == "HEAD" ] ; then
+if [ "$REQUEST_METHOD" = "HEAD" ] ; then
 	printf 'Access-Control-Allow-Origin: *\ndzr-api: 0\n\n'
-elif [ "$REQUEST_METHOD" == "GET" ] ; then
+elif [ "$REQUEST_METHOD" = "GET" ] ; then
 	printf "Cache-Control: max-age=31536000, immutable\nContent-Type: audio/mpeg\n\n"
 	echo "$QUERY_STRING" | xargs basename | xargs $0-url | while read url id; do
 		$FETCH "$url" | $0-dec $id
