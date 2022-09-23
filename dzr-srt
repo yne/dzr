@@ -1,0 +1,27 @@
+#!/bin/sh
+# USAGE Example:
+# ./dzr-srt 355777961
+
+SNG_IDS=$(printf "%s" "$*" | sed 's/ /,/g')
+FETCH=${FETCH:-curl -s} # FETCH="wget -q -O -" or FETCH="curl -s -k"
+gw () {
+  method="$1"; session="$2" ;apiToken="$3" ; shift 3 # curl args ...
+  $FETCH "https://www.deezer.com/ajax/gw-light.php?method=$method&input=3&api_version=1.0&api_token=$apiToken" --header "Cookie: sid=$session" "$@"
+}
+
+[ -z "$SNG_IDS" ] && echo "USAGE: dzr-srt 5404528" && exit 1
+DZR_URL="www.deezer.com/ajax/gw-light.php?method=deezer.ping&api_version=1.0&api_token"
+DZR_SID=$($FETCH "$DZR_URL" | jq -r .results.SESSION)
+USR_NFO=$(gw deezer.getUserData "$DZR_SID" "$API_TOK")
+USR_TOK=$(printf "%s" "$USR_NFO" | jq -r .results.USER_TOKEN)
+USR_LIC=$(printf "%s" "$USR_NFO" | jq -r .results.USER.OPTIONS.license_token)
+API_TOK=$(printf "%s" "$USR_NFO" | jq -r .results.checkForm)
+#printf "SID=$DZR_SID\nAPI=$API_TOK\nLIC=$USR_LIC\nTOK=$USR_TOK\nIDS=$SNG_IDS\n" 1>&2
+
+gw song.getLyrics "$DZR_SID" "$API_TOK" --data "{\"sng_id\":$SNG_IDS}" |
+jq -r '.results.LYRICS_SYNC_JSON | map(select(.lrc_timestamp)) | to_entries | map([.key+1, "00:"+.value.lrc_timestamp[1:-1] + .value.milliseconds, (.value.duration|tonumber/1000|tostring), .value.line])[]|@tsv' |
+while IFS=$'\t' read -r id start length text; do
+  from=$(date +%H:%M:%S,%N --date "$start") ;
+  to=$(date +%H:%M:%S,%N --date "$start + $length second") ;
+  printf "$id\n${from::12} --> ${to::12}\n$text\n\n" ;
+done

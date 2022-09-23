@@ -47,6 +47,14 @@ dzr             # welcome screen
 dzr /artist/860 # browse deezer.com/en/artist/860
 ```
 
+## Real time Lyrics
+
+Use `dzr-srt` to extract lyrics of the current track and pass it to mpv as --sub-file :
+
+```sh
+PLAYER='mpv --sub-file=<(dzr-srt $id) -' dzr /track/14408104
+```
+
 ## Usage as HTTP server
 
 ```sh

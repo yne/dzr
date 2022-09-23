@@ -16,7 +16,7 @@ USR_NFO=$(gw deezer.getUserData "$DZR_SID" "$API_TOK")
 USR_TOK=$(printf "%s" "$USR_NFO" | jq -r .results.USER_TOKEN)
 USR_LIC=$(printf "%s" "$USR_NFO" | jq -r .results.USER.OPTIONS.license_token)
 API_TOK=$(printf "%s" "$USR_NFO" | jq -r .results.checkForm)
-printf "SID=$DZR_SID\nAPI=$API_TOK\nLIC=$USR_LIC\nTOK=$USR_TOK\nIDS=$SNG_IDS\n" 1>&2
+#printf "SID=$DZR_SID\nAPI=$API_TOK\nLIC=$USR_LIC\nTOK=$USR_TOK\nIDS=$SNG_IDS\n" 1>&2
 
 SNG_NFO=$(gw song.getListData "$DZR_SID" "$API_TOK" --data "{\"sng_ids\":[$SNG_IDS]}")
 SNG_TOK=$(printf "%s" "$SNG_NFO" | jq [.results.data[].TRACK_TOKEN])
