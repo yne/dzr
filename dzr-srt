@@ -18,8 +18,7 @@ USR_LIC=$(printf "%s" "$USR_NFO" | jq -r .results.USER.OPTIONS.license_token)
 API_TOK=$(printf "%s" "$USR_NFO" | jq -r .results.checkForm)
 #printf "SID=$DZR_SID\nAPI=$API_TOK\nLIC=$USR_LIC\nTOK=$USR_TOK\nIDS=$SNG_IDS\n" 1>&2
 
-gw song.getLyrics "$DZR_SID" "$API_TOK" --data "{\"sng_id\":$SNG_IDS}" |
-jq -r '.results.LYRICS_SYNC_JSON | map(select(.lrc_timestamp)) | to_entries | map([.key+1, "00:"+.value.lrc_timestamp[1:-1] + .value.milliseconds, (.value.duration|tonumber/1000|tostring), .value.line])[]|@tsv' |
+gw song.getLyrics "$DZR_SID" "$API_TOK" --data "{\"sng_id\":$SNG_IDS}" | jq -r 'if (.results.LYRICS_SYNC_JSON) then .results.LYRICS_SYNC_JSON | map(select(.lrc_timestamp)) | to_entries | map([.key+1, "00:"+.value.lrc_timestamp[1:-1] + .value.milliseconds, (.value.duration|tonumber/1000|tostring), .value.line])[]|@tsv else "1\t00:00:00.0\t0.0\t" end' | 
 while IFS=$'\t' read -r id start length text; do
   from=$(date +%H:%M:%S,%N --date "$start") ;
   to=$(date +%H:%M:%S,%N --date "$start + $length second") ;
