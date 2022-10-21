@@ -1,0 +1,45 @@
+#!/bin/sh
+# USAGE Example:
+# ./dzr-tag 5404528 tagMe.mp3
+
+SNG_ID=$(echo "$1" | tr -dc '0-9') # extract id from path,url,...
+if [ -z "$SNG_ID" -o ! -f "$2" ]; then
+    echo "USAGE: dzr-id3 5404528 target.mp3" && exit 1
+fi
+
+FETCH=${FETCH:-curl -s} # FETCH="wget -q -O -" or FETCH="curl -s -k"
+gw () {
+  method="$1"; session="$2" ;apiToken="$3" ; shift 3 # curl args ...
+  $FETCH "https://www.deezer.com/ajax/gw-light.php?method=$method&input=3&api_version=1.0&api_token=$apiToken" --header "Cookie: sid=$session" "$@"
+}
+
+DZR_URL="www.deezer.com/ajax/gw-light.php?method=deezer.ping&api_version=1.0&api_token"
+DZR_SID=$($FETCH "$DZR_URL" | jq -r .results.SESSION)
+USR_NFO=$(gw deezer.getUserData "$DZR_SID" "$API_TOK")
+USR_TOK=$(printf "%s" "$USR_NFO" | jq -r .results.USER_TOKEN)
+USR_LIC=$(printf "%s" "$USR_NFO" | jq -r .results.USER.OPTIONS.license_token)
+API_TOK=$(printf "%s" "$USR_NFO" | jq -r .results.checkForm)
+SNG_NFO=$(gw song.getListData "$DZR_SID" "$API_TOK" --data "{\"sng_ids\":[$SNG_ID]}")
+
+# extract ID3 field we need
+ART_NAME=$(echo "${SNG_NFO}" | jq -r .results.data[0].ART_NAME)
+REL_DATE=$(echo "${SNG_NFO}" | jq -r .results.data[0].PHYSICAL_RELEASE_DATE) # TODO: sometimes 0000-00-00
+SNG_TITLE=$(echo "${SNG_NFO}" | jq -r .results.data[0].SNG_TITLE)
+ALB_TITLE=$(echo "${SNG_NFO}" | jq -r .results.data[0].ALB_TITLE)
+TRK_NUMBR=$(echo "${SNG_NFO}" | jq -r .results.data[0].TRACK_NUMBER)
+ALB_PICTURE=$(echo "${SNG_NFO}" | jq -r .results.data[0].ALB_PICTURE)
+APICNAME=".$ALB_PICTURE.jpg"
+$FETCH "https://e-cdn-images.dzcdn.net/images/cover/$ALB_PICTURE/1024x1024-000000-100-0-0.jpg" > "$APICNAME"
+FILENAME="$ART_NAME - $SNG_TITLE.mp3"
+# eyeD3 mid3/mutagen (both python lib) seems to be the only one supporting APIC tag
+# contact me if you find a dependency-less widely-available id3tag editor
+eyeD3 \
+  --artist "$ART_NAME" \
+  --title "$SNG_TITLE" \
+  --album "$ALB_TITLE" \
+  --track "$TRK_NUMBR" \
+  --release-date "$REL_DATE" \
+  --add-image "$APICNAME:FRONT_COVER" \
+  "$2" &&
+rm "$APICNAME" &&
+mv "$2" "$FILENAME"
