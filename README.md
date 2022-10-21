@@ -74,10 +74,11 @@ PLAYER='mpv --sub-file=<(dzr-srt $id) -' dzr /track/14408104
 
 ## HTTP/Web interface
 
-unli
+In addition to it command line interface, `dzr` also support being invoked from a cgi server :
 
 ```sh
-mkdir -p cgi-bin && cp dzr* ./cgi-bin/
+mkdir -p cgi-bin
+cp dzr* ./cgi-bin/
 python3 -m http.server --cgi
 ```
 
@@ -86,5 +87,3 @@ You shall then be able to play any track over HTTP (ex: http://127.0.0.1:8000/cg
 A **basic** web interface is also available on http://127.0.0.1:8000
 
 Feel free to create your own frontend an publish it as a new repository (not as a dzr fork) with the [dzr](https://github.com/topics/dzr) tag.
-
-## Usage as 
