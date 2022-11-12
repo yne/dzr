@@ -26,5 +26,5 @@ jobs:
           curl -s -XPOST -T $RELEASE_FILE \
           -H "Authorization: token $GITHUB_TOKEN" \
           -H "Content-Type:application/octet-stream" \
-          "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID/assets?name=$RELEASE_FILE-$OS" || :
+          "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID/assets?name=$RELEASE_FILE" || :
         done
