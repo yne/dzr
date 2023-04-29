@@ -1,9 +1,9 @@
 #!/bin/sh
-# dependencies check, see: https://github.com/yne/dzr/issues/12
-FETCH=${FETCH:-curl -s} # FETCH="wget -q -O -" or FETCH="curl -s -k"
-# handle CGI call, for example moving ./dzr* bin to ~/cgi-bin and running :
+
+# CGI call handling, for example moving ./dzr* bin to ~/cgi-bin and running :
 #     python3 -m http.server --cgi
 # from your ~ (as non-root !) will reply to http://0.0.0.0:8000/cgi-bin/dzr?6113114,806027
+FETCH=${FETCH:-curl -s} # FETCH="wget -q -O -" or FETCH="curl -s -k"
 if [ "$REQUEST_METHOD" = "HEAD" ] ; then
 	printf 'Access-Control-Allow-Origin: *\ndzr-api: 0\n\n'
 elif [ "$REQUEST_METHOD" = "GET" ] ; then
@@ -13,19 +13,25 @@ elif [ "$REQUEST_METHOD" = "GET" ] ; then
 	done
 fi
 [ ! -z "$REQUEST_METHOD" ] && exit
-for c in jq curl dialog openssl mpv; do
-	command -v $c >/dev/null || { echo "$c is required" 1>&2 && exit 1 ;}
+
+# dependencies check, see: https://github.com/yne/dzr/issues/12
+for c in jq curl dialog openssl mpv; do # TODO use $PLAYER
+	command -v $c >/dev/null || { echo "$c is required" 1>&2 ; UNMET_DEPENDENCIES=1;}
 done
-unscramble(){ printf "${8}${16}${7}${15}${6}${14}${5}${13}${4}${12}${3}${11}${2}${10}${1}${9}";}
+[ -n "$UNMET_DEPENDENCIES" ] && exit 1;
+
 # extraction + warning by charleywright, see: https://github.com/yne/dzr/issues/11
+unscramble(){ printf "${8}${16}${7}${15}${6}${14}${5}${13}${4}${12}${3}${11}${2}${10}${1}${9}";}
 if [ -z "$DZR_CBC" ]; then
-	echo -e "WARNING:\nDZR_CBC variable is unset\nextracting from web-player..."
+	printf "WARNING:\nDZR_CBC variable is unset\nextracting from web-player...\n"
 	APP_WEB=$($FETCH -L deezer.com/en/channels/explore | sed -n 's/.*src="\([^"]*app-web[^"]*\).*/\1/p' | xargs $FETCH -L)
-	TMP_CBC=$(echo "$APP_WEB" | tr ,_ '\n' | sed -n 's/.*\(%5B0x[63]1%.\{48\}%5D\).*/\1/p' | sed 's/%5[BD]//g;s/%/\\x/g' | xargs -0 printf %b | sed 's/0x/\\x/g' | tr , '\n' | xargs -0 printf %b)
+	TMP_CBC=$(echo "$APP_WEB"  | tr ,_ '\n'  | sed -n 's/.*\(%5B.\{53\}%5D\).*/\1/p' | sed 's/%../\n/g' | sed 's/0x/\\x/')
 	export DZR_CBC=$(unscramble $TMP_CBC);
-	echo -e "    echo \"export DZR_CBC="$DZR_CBC"\" >> .profile\nto avoid this warning"
+	printf "    echo \"export DZR_CBC="$DZR_CBC"\" >> \$HOME/.profile && source \$HOME/.profile\nto avoid this warning\n"
 	sleep 2 # give time to read the warning
 fi
+
+# main
 API="api.deezer.com"
 DLG_LIST="dialog --keep-tite --output-fd 1 --menu $1: 0 0 0"
 DLG_TEXT="dialog --keep-tite --output-fd 1 --inputbox $1: 0 0"
