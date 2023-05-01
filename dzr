@@ -4,6 +4,7 @@
 #     python3 -m http.server --cgi
 # from your ~ (as non-root !) will reply to http://0.0.0.0:8000/cgi-bin/dzr?6113114,806027
 FETCH=${FETCH:-curl -s} # FETCH="wget -q -O -" or FETCH="curl -s -k"
+PLAYER=${PLAYER:-'mpv -'} # PLAYER="ffplay -"
 if [ "$REQUEST_METHOD" = "HEAD" ] ; then
 	printf 'Access-Control-Allow-Origin: *\ndzr-api: 0\n\n'
 elif [ "$REQUEST_METHOD" = "GET" ] ; then
@@ -15,7 +16,7 @@ fi
 [ ! -z "$REQUEST_METHOD" ] && exit
 
 # dependencies check, see: https://github.com/yne/dzr/issues/12
-for c in jq curl dialog openssl mpv; do # TODO use $PLAYER
+for c in jq curl dialog openssl $(echo "$PLAYER" | cut -f 1 -d " "); do
 	command -v $c >/dev/null || { echo "$c is required" 1>&2 ; UNMET_DEPENDENCIES=1;}
 done
 [ -n "$UNMET_DEPENDENCIES" ] && exit 1;
@@ -23,11 +24,12 @@ done
 # extraction + warning by charleywright, see: https://github.com/yne/dzr/issues/11
 unscramble(){ printf "${8}${16}${7}${15}${6}${14}${5}${13}${4}${12}${3}${11}${2}${10}${1}${9}";}
 if [ -z "$DZR_CBC" ]; then
-	printf "WARNING:\nDZR_CBC variable is unset\nextracting from web-player...\n"
+	printf "Add the following to your shell profile e.g. ~/.profile or ~/.zshrc:" >&2
 	APP_WEB=$($FETCH -L deezer.com/en/channels/explore | sed -n 's/.*src="\([^"]*app-web[^"]*\).*/\1/p' | xargs $FETCH -L)
 	TMP_CBC=$(echo "$APP_WEB"  | tr ,_ '\n'  | sed -n 's/.*\(%5B.\{53\}%5D\).*/\1/p' | sed 's/%../\n/g' | sed 's/0x/\\x/')
 	export DZR_CBC=$(unscramble $TMP_CBC);
-	printf "    echo \"export DZR_CBC="$DZR_CBC"\" >> \$HOME/.profile && source \$HOME/.profile\nto avoid this warning\n"
+	printf "    export DZR_CBC=$DZR_CBC" >&2
+	[ "-$@" = "-!" ] && printf '%s' "$DZR_CBC" && exit
 	sleep 2 # give time to read the warning
 fi
 
