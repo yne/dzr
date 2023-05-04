@@ -26,7 +26,7 @@ unscramble(){ printf "${8}${16}${7}${15}${6}${14}${5}${13}${4}${12}${3}${11}${2}
 if [ -z "$DZR_CBC" ]; then
 	printf "Add the following to your shell profile e.g. ~/.profile or ~/.zshrc:" >&2
 	APP_WEB=$($FETCH -L deezer.com/en/channels/explore | sed -n 's/.*src="\([^"]*app-web[^"]*\).*/\1/p' | xargs $FETCH -L)
-	TMP_CBC=$(echo "$APP_WEB"  | tr ,_ '\n'  | sed -n 's/.*\(%5B.\{53\}%5D\).*/\1/p' | sed 's/%../\n/g' | sed 's/0x/\\x/')
+	TMP_CBC=$(echo "$APP_WEB"  | tr ,_ '\n'  | sed -n 's/.*\(%5B.\{53\}%5D\).*/\1/p' | sed 's/%../\n/g' | xargs printf '\\%o ')
 	export DZR_CBC=$(unscramble $TMP_CBC);
 	printf "    export DZR_CBC=$DZR_CBC" >&2
 	[ "-$@" = "-!" ] && printf '%s' "$DZR_CBC" && exit
