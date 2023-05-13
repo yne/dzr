@@ -15,23 +15,25 @@ elif [ "$REQUEST_METHOD" = "GET" ] ; then
 fi
 [ ! -z "$REQUEST_METHOD" ] && exit
 
+# extraction + warning by charleywright, see: https://github.com/yne/dzr/issues/11
+unscramble(){ printf "${8}${16}${7}${15}${6}${14}${5}${13}${4}${12}${3}${11}${2}${10}${1}${9}";}
+if [ -z "$DZR_CBC" ]; then
+	command -v $(echo "$FETCH" | cut -f 1 -d " ") >/dev/null || { echo "key extraction require $FETCH" 1>&2 ; exit 1 ;}
+	printf "Add the following to your shell profile e.g. ~/.profile or ~/.zshrc:\n" >&2
+	APP_WEB=$($FETCH -L deezer.com/en/channels/explore | sed -n 's/.*src="\([^"]*app-web[^"]*\).*/\1/p' | xargs $FETCH -L)
+	TMP_CBC=$(echo "$APP_WEB"  | tr ,_ '\n'  | sed -n 's/.*\(%5B0x..%2C.\{39\}%2C0x..%5D\).*/\1/p' | sed 's/%../\n/g' | xargs printf '\\%o ')
+	export DZR_CBC=$(unscramble $TMP_CBC);
+	printf "    export DZR_CBC=$DZR_CBC" >&2
+	[ "-$@" = "-!" ] && printf '%s' "$DZR_CBC" && exit
+	sleep 2 # give time to read the warning
+	echo
+fi
+
 # dependencies check, see: https://github.com/yne/dzr/issues/12
 for c in jq curl dialog openssl $(echo "$PLAYER" | cut -f 1 -d " "); do
 	command -v $c >/dev/null || { echo "$c is required" 1>&2 ; UNMET_DEPENDENCIES=1;}
 done
 [ -n "$UNMET_DEPENDENCIES" ] && exit 1;
-
-# extraction + warning by charleywright, see: https://github.com/yne/dzr/issues/11
-unscramble(){ printf "${8}${16}${7}${15}${6}${14}${5}${13}${4}${12}${3}${11}${2}${10}${1}${9}";}
-if [ -z "$DZR_CBC" ]; then
-	printf "Add the following to your shell profile e.g. ~/.profile or ~/.zshrc:" >&2
-	APP_WEB=$($FETCH -L deezer.com/en/channels/explore | sed -n 's/.*src="\([^"]*app-web[^"]*\).*/\1/p' | xargs $FETCH -L)
-	TMP_CBC=$(echo "$APP_WEB"  | tr ,_ '\n'  | sed -n 's/.*\(%5B\(0x[0-9a-f]\{2\}\(%2C\)\?\)\{8\}%5D\).*/\1/p' | sed 's/%../\n/g' | xargs printf '\\%o ')
-	export DZR_CBC=$(unscramble $TMP_CBC);
-	printf "    export DZR_CBC=$DZR_CBC" >&2
-	[ "-$@" = "-!" ] && printf '%s' "$DZR_CBC" && exit
-	sleep 2 # give time to read the warning
-fi
 
 # main
 API="api.deezer.com"

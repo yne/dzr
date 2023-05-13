@@ -1,6 +1,6 @@
 ![dzr logo](.github/.logo.svg)
 
-# DZR: the command line deezer.com player
+# DZR: the command line deezer.com player [![ci](https://github.com/yne/dzr/actions/workflows/ci.yml/badge.svg)](https://github.com/yne/dzr/actions/workflows/ci.yml)
 
 > ⚠️ For [legal reasons](https://github.com/github/dmca/blob/master/2021/02/2021-02-10-deezer.md) this project
 > - does not contain any track decryption key
