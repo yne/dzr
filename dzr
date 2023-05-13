@@ -26,7 +26,7 @@ unscramble(){ printf "${8}${16}${7}${15}${6}${14}${5}${13}${4}${12}${3}${11}${2}
 if [ -z "$DZR_CBC" ]; then
 	printf "Add the following to your shell profile e.g. ~/.profile or ~/.zshrc:" >&2
 	APP_WEB=$($FETCH -L deezer.com/en/channels/explore | sed -n 's/.*src="\([^"]*app-web[^"]*\).*/\1/p' | xargs $FETCH -L)
-	TMP_CBC=$(echo "$APP_WEB"  | tr ,_ '\n'  | sed -n 's/.*\(%5B.\{53\}%5D\).*/\1/p' | sed 's/%../\n/g' | xargs printf '\\%o ')
+	TMP_CBC=$(echo "$APP_WEB"  | tr ,_ '\n'  | sed -n 's/.*\(%5B\(0x[0-9a-f]\{2\}\(%2C\)\?\)\{8\}%5D\).*/\1/p' | sed 's/%../\n/g' | xargs printf '\\%o ')
 	export DZR_CBC=$(unscramble $TMP_CBC);
 	printf "    export DZR_CBC=$DZR_CBC" >&2
 	[ "-$@" = "-!" ] && printf '%s' "$DZR_CBC" && exit
@@ -50,7 +50,7 @@ dzr_artist_0() { $DLG_LIST top?limit=50 '' albums '' fans '' related '' radio ''
 dzr_default()  { $FETCH -H "Accept-Language: $LANG" "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST @ "play all /track/" ;} # TODO: .next
 play() { # receive /track/1,2,3 from stdin
 	xargs basename | xargs $0-url | while read url id; do
-		$FETCH "$url" | $0-dec $id | eval ${PLAYER:-'mpv -'} ;
+		$FETCH "$url" | $0-dec $id | eval ${PLAYER:-'mpv -'} || break # stop if Ctrl+C : $? = 4
 	done
 }
 for url in "$@"; do
