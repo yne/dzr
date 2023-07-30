@@ -49,9 +49,9 @@ dzr_radio_0()  { $DLG_LIST tracks '' fans '' ;}
 dzr_album_0()  { $DLG_LIST tracks '' fans '' ;}
 dzr_user_0()   { $DLG_LIST charts '' albums '' playlists '' flow '' tracks '' artists '' ;}
 dzr_artist_0() { $DLG_LIST top?limit=50 '' albums '' fans '' related '' radio '' playlists '' ;}
-dzr_default()  { $FETCH -H "Accept-Language: $LANG" "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST @ "play all /track/" ;} # TODO: .next
+dzr_default()  { $FETCH -H "Accept-Language: $LANG" "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST ▸ "play all /track/" ⇄ "shuf all /track/" ;} # TODO: .next
 play() { # receive /track/1,2,3 from stdin
-	xargs basename | xargs $0-url | while read url id; do
+	xargs basename | xargs $0-url | ${1:-cat} | while read url id; do
 		$FETCH "$url" | $0-dec $id | eval ${PLAYER:-'mpv -'} || break # stop if Ctrl+C : $? = 4
 	done
 }
@@ -66,7 +66,8 @@ for url in "$@"; do
 	echo "$0 $url" >&2
 	while path=$($FUNC $url); do # browse REPL
 		case "$path" in
-		@) echo "$API$url"; $FETCH "$API$url" | jq "$FMT_TRKS" | play ; break ;;
+		▸) echo "$API$url"; $FETCH "$API$url" | jq "$FMT_TRKS" | play cat; break ;;
+		⇄) echo "$API$url"; $FETCH "$API$url" | jq "$FMT_TRKS" | play shuf; break ;;
 		/*) $0 "$path";;
 		*)  $0 "$url/$path";;
 		esac
