@@ -1,0 +1,90 @@
+<nav>
+    <a href="command:dzr.add" title="Add to Queue">+</a>
+    <a href="command:dzr.clear" title="Flush Queue">&times;</a>
+    <a href="command:dzr.shuffle" title="Shuffle Queue">⇄</a>
+    <audio controls onloadstart="play()" style="flex:1"></audio>
+    <a href="command:dzr.next" title="Next Track">›</a>
+</nav>
+<!--VSCode require at least 1 (one) user interaction for Audio playback: use this popup -->
+<dialog open style="border:none;border-radius:25px;box-shadow: 0 0 0 2000px rgb(20 20 20 / 95%);">
+    <form method="dialog">
+        <h1>Disclamer</h1>
+        <p>Closing the player tab will stop the playback</p>
+        <div><button style="width: 100%;">OK</button></div>
+    </form>
+</dialog>
+<ol></ol>
+<script type=module>
+const post = acquireVsCodeApi().postMessage;
+const [audio] = document.getElementsByTagName('audio');
+const [queue] = document.getElementsByTagName('ol');
+const [dialog] = document.getElementsByTagName('dialog');
+const cmd = (name, ...args) => `command:${name}?` + encodeURIComponent(JSON.stringify(args));
+dialog.onclose=()=>{audio.play();post('user_interact');}
+['ended', 'pause', 'playing'].map(on => audio.addEventListener(on, () => post('player_' + on)));
+let mediaSource, sourceBuffer;
+const on = {// event from VSCode
+    async open({id}) {
+        mediaSource = new window.MediaSource();
+        audio.src = window.URL.createObjectURL(mediaSource);
+        await new Promise(then => mediaSource.onsourceopen = () => then());
+        sourceBuffer = mediaSource.addSourceBuffer("audio/mpeg");
+        sourceBuffer.addEventListener("updateend", (ev) => post('player_bufferized'));
+    },
+    append(buf) { sourceBuffer.appendBuffer(buf) },
+    close() { mediaSource.endOfStream() },
+    play() { audio.play().catch(e=>post('error', e)) },
+    pause() { audio.pause() },
+    state(state, updates=[]) {
+        const hhmmss = (s) => (new Date(s*1000)).toISOString().slice(11,19).replace(/^00:/,'')
+        const el = (tag, props={}, ch=[]) => ch.reduce((e,c) => (e.appendChild(c),e),Object.assign(document.createElement(tag),props))
+        if(updates.includes('queue'))queue.replaceChildren(...state.queue.map((item,index)=>el('li',{id:item.id}, [
+            el('a', {href:cmd('dzr.next', index)}, [new Text(item.title)]), new Text(` · `),
+            ...item.artists?.map(artist => el('a', {href:cmd('dzr.add', '/artist/' + artist.id)}, [new Text(artist.name)])),
+            el('span',{classList:'weak'},[new Text(` (${hhmmss(item.duration)}) `)]),
+            el('a', {href:cmd('dzr.pop', index),classList:'on-hover'}, [new Text('remove')])
+        ])));
+    }
+};
+window.addEventListener('message', ({ data: [cmd,...args] }) => {
+    if (!on[cmd]) return console.log("bad message:" + JSON.stringify([cmd,...args]));
+    on[cmd](...args);
+});
+
+</script>
+<style>
+    body{margin-top:16px;}
+    a{text-decoration: none;}
+    a:hover{text-decoration: underline;}
+    li>a:not(:first-child)+a::before {content: ', ';}
+    :not(:hover)>.on-hover{opacity:0}
+    .weak {color: var(--vscode-descriptionForeground);}
+    dialog::backdrop {background-color: rgba(0,0,0,.9);}
+    nav {
+        display: flex;
+        gap: 8px;
+    }
+
+    nav>a:hover {
+        cursor: pointer;
+        color:initial;
+        background: radial-gradient(circle,
+                rgb(230, 233, 233) 50%,
+                rgb(241, 243, 244) 50%);
+    }
+
+    nav>a {
+        margin: 0;
+        padding: 0;
+        border: none;
+        border-radius: 100px;
+        height: 54px;
+        width: 54px;
+        font-size: 22px;
+        background: rgb(241, 243, 244);
+        line-height: 50px;
+        text-decoration: none !important;
+        color: black;
+        text-align: center;
+    }
+</style>

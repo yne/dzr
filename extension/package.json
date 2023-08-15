@@ -1,0 +1,100 @@
+{
+	"name": "dzr",
+	"displayName": "DZR player",
+	"description": "deezer.com player",
+	"version": "0.0.1",
+	"publisher": "yne",
+	"engines": {
+		"vscode": "^1.73.0"
+	},
+	"main": "./main.js",
+	"activationEvents": [
+		"*"
+	],
+	"contributes": {
+		"commands": [
+			{
+				"category": "dzr",
+				"command": "dzr.show",
+				"title": "Show Player Tab",
+				"icon": "$(eye)"
+			},
+			{
+				"category": "dzr",
+				"command": "dzr.play",
+				"title": "Play",
+				"icon": "$(debug-run)"
+			},
+			{
+				"category": "dzr",
+				"command": "dzr.pause",
+				"title": "Pause",
+				"icon": "$(debug-pause)"
+			},
+			{
+				"category": "dzr",
+				"command": "dzr.next",
+				"title": "Play next",
+				"icon": "$(chevron-right)"
+			},
+			{
+				"category": "dzr",
+				"command": "dzr.loopAll",
+				"title": "Loop all Enable",
+				"icon": "$(sync)"
+			},
+			{
+				"category": "dzr",
+				"command": "dzr.loopOff",
+				"title": "Loop all Disable",
+				"icon": "$(sync-ignored)"
+			},
+			{
+				"category": "dzr",
+				"command": "dzr.add",
+				"title": "Queue Add",
+				"icon": "$(add)"
+			},
+			{
+				"category": "dzr",
+				"command": "dzr.clear",
+				"title": "Queue Clear",
+				"icon": "$(clear-all)"
+			},
+			{
+				"category": "dzr",
+				"command": "dzr.shuffle",
+				"title": "Queue Shuffle",
+				"icon": "$(arrow-swap)"
+			}
+		],
+		"menus": {
+			"editor/title": [
+				{"group": "navigation", "when": "dzr.ready && !dzr.playing",  "command": "dzr.play" },
+				{"group": "navigation", "when": "dzr.ready && dzr.playing",   "command": "dzr.pause" },
+				{"group": "navigation", "command": "dzr.add" }
+			]
+		},
+		"configuration": {
+			"type": "object",
+			"title": "dzr configuration",
+			"properties": {
+				"dzr.cbc": {
+					"type": "string",
+					"default": "",
+					"description": "track decryption key"
+				},
+				"dzr.queue": {
+					"type": "array",
+					"default": [],
+					"description": "Persistent track queue"
+				},
+				"dzr.loop": {
+					"type": "boolean",
+					"default": false,
+					"description": "Queue looping"
+				}
+			}
+		}
+	}
+}
