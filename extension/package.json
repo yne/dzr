@@ -12,6 +12,18 @@
 		"*"
 	],
 	"contributes": {
+		"viewsWelcome": [
+			{
+				"view": "explorer.dzr",
+				"contents": "not shown"
+			}
+		],
+		"keybindings (displayed but dont work)": [
+			{
+				"command": "dzr.remove",
+				"key": "delete"
+			}
+		],
 		"commands": [
 			{
 				"category": "dzr",
@@ -57,6 +69,18 @@
 			},
 			{
 				"category": "dzr",
+				"command": "dzr.remove",
+				"title": "Queue Remove",
+				"icon": "$(close)"
+			},
+			{
+				"category": "dzr",
+				"command": "dzr.removeAt",
+				"title": "Queue Remove",
+				"icon": "$(close)"
+			},
+			{
+				"category": "dzr",
 				"command": "dzr.clear",
 				"title": "Queue Clear",
 				"icon": "$(clear-all)"
@@ -69,10 +93,34 @@
 			}
 		],
 		"menus": {
-			"editor/title": [
-				{"group": "navigation", "when": "dzr.ready && !dzr.playing",  "command": "dzr.play" },
-				{"group": "navigation", "when": "dzr.ready && dzr.playing",   "command": "dzr.pause" },
-				{"group": "navigation", "command": "dzr.add" }
+			"view/title": [
+				{
+					"when": "view == dzr.queue && dzr.queue!=''",
+					"group": "navigation@1",
+					"command": "dzr.clear"
+				},
+				{
+					"when": "view == dzr.queue && dzr.queue!=''",
+					"group": "navigation@2",
+					"command": "dzr.shuffle"
+				},
+				{
+					"when": "view == dzr.queue",
+					"group": "navigation@3",
+					"command": "dzr.add"
+				}
+			],
+			"view/item/context": [
+				{
+					"group": "inline",
+					"command": "dzr.remove",
+					"when": "viewItem == dzr.track"
+				},
+				{
+					"group": "navigation",
+					"command": "dzr.remove",
+					"when": "viewItem == dzr.track"
+				}
 			]
 		},
 		"configuration": {
@@ -89,12 +137,23 @@
 					"default": [],
 					"description": "Persistent track queue"
 				},
-				"dzr.loop": {
+				"dzr.looping": {
 					"type": "boolean",
 					"default": false,
 					"description": "Queue looping"
 				}
 			}
+		},
+		"views": {
+			"explorer": [
+				{
+					"id": "dzr.queue",
+					"name": "Player Queue",
+					"icon": "play",
+					"contextualTitle": "Queue",
+					"whenn": "dzr.ready"
+				}
+			]
 		}
 	}
 }
