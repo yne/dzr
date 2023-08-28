@@ -14,6 +14,7 @@ const type2icon = {
 	user: '$(account) ',
 };
 const hhmmss = (s) => (new Date(s * 1000)).toISOString().slice(11, 19).replace(/^00:/, '');
+const wait = (ms=1000) => new Promise(resolve => setTimeout(resolve, ms));
 // still no fetch() in 2023 ?
 const fetch = (url, opt, data) => new Promise((resolve, reject) => {
 	const chunks = [], req = https.request(url, opt, res => {
@@ -90,7 +91,7 @@ async function browse(url_or_event, label) {
 		}
 	} catch (e) { console.error(e) }
 }
-
+/* songs may came from API (full info) or storage (light info) */
 const with_url = async (songs) => songs?.length ? await vscode.window.withProgress({ title: 'Fetching Song Info...', location }, async (progress) => {
 	try {
 		const next = (val) => (progress.report({ increment: 100 / 4 }), val);
@@ -107,9 +108,12 @@ const with_url = async (songs) => songs?.length ? await vscode.window.withProgre
 		}))));
 		const errors = URL_NFO.data.map((nfo, i) => [nfo.errors, songs[i]]).filter(([err]) => err).map(([[err], sng]) => `${sng.title}: ${err.message} (${err.code})`).join('\n');
 		if (errors) setTimeout(() => vscode.window.showWarningMessage(errors), 500); // can't warn while progress ?
-		return songs.map(({ id, title_short, title_version, artist, contributors, duration }, i) => ({
-			id, title: title_short.replace(/ ?\(feat.*?\)/, ''), version: title_version, duration,
-			artists: (contributors || [artist])?.map(({ id, name }) => ({ id, name })),
+		return songs.map(({/* api :*/ id, md5_image, duration, title_short, title_version, artist, contributors,
+		                   /*cache:*/ title, version, artists }, i) => ({
+			id, md5_image, duration,
+			title: title_short?.replace(/ ?\(feat.*?\)/, '') || title,
+			version: title_version || version,
+			artists: artists??(contributors || [artist])?.map(({ id, name }) => ({ id, name })),
 			size: +SNG_NFO.data[i].FILESIZE,
 			expire: SNG_NFO.data[i].TRACK_TOKEN_EXPIRE,
 			url: URL_NFO.data[i].media?.[0]?.sources?.[0]?.url
@@ -257,7 +261,11 @@ exports.activate = async function (/**@type {vscode.ExtensionContext}*/ context)
 			item && vscode.commands.executeCommand('dzr.load', item);
 		}),
 		vscode.commands.registerCommand("dzr.load", async (item) => {
-			if (item.expire > new Date()/1000) {
+			if (!dzr.state.ready) {
+				vscode.commands.executeCommand('dzr.show');
+				while (!dzr.state.ready) await wait();
+			}
+			if (item.expire < (new Date()/1000)) {
 				with_url(dzr.state.queue);//TODO: hope item is now up to date
 			}
 			const hex = (str) => str.split('').map(c => c.charCodeAt(0))

@@ -22,7 +22,7 @@ dialog.onclose=()=>{audio.play();post('user_interact');}
 let mediaSource, sourceBuffer;
 const on = {// event from VSCode
     async open(item) {
-        img.src = "https://api.deezer.com/cover/"+item.id;
+        img.src = `https://e-cdns-images.dzcdn.net/images/cover/${item.md5_image}/1000x1000-000000-80-0-0.jpg`;
         mediaSource = new window.MediaSource();
         audio.src = window.URL.createObjectURL(mediaSource);
         await new Promise(then => mediaSource.onsourceopen = () => then());

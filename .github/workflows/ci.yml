@@ -13,6 +13,8 @@ jobs:
     - name: check key extract
       run: |
         [ "$(DZR_CBC= ./dzr ! 2>/dev/null | sha1sum)" = '3ad58d9232a3745ad9308b0669c83b6f7e8dba4d  -' ]
+    - name: bundle VSIX
+      run: zip -r $(jq -r '.name+"-"+.version+".vsix"' < extension/package.json) extension
     - name: publish
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
