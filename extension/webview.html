@@ -9,20 +9,24 @@
         <div><button style="width: 100%;">OK</button></div>
     </form>
 </dialog>
-<img style="display: block;margin: auto; width: 50vmin; height: 50vmin; padding-top: 10vmin;">
-<audio controls onloadstart="play()" style="display: block;margin: auto;width: 50vmin; height: 25vmin;"></audio>
+<img style="display: block;border:0;margin: auto; width: 50vmin; height: 50vmin; margin-top: 10vmin;border-radius:27px">
+<div id="title" style="font-size:20px;margin: 20px 0 0 0;text-align: center;"></div>
+<div id="artists" style="font-size:20px;margin: 20px;display: flex;justify-content: center;gap: 0.5em;flex-flow: wrap;"></div>
+<audio controls onloadstart="play()" style="display: block;margin: auto;width: 50vmin;"></audio>
 <script type=module>
+const el = (tag, props={}, ch=[]) => ch.reduce((e,c) => (e.appendChild(c),e),Object.assign(document.createElement(tag),props));
 const post = acquireVsCodeApi().postMessage;
 const [img] = document.getElementsByTagName('img');
 const [audio] = document.getElementsByTagName('audio');
 const [dialog] = document.getElementsByTagName('dialog');
+const title = document.getElementById('title');
+const artists = document.getElementById('artists');
 const cmd = (name, ...args) => `command:${name}?` + encodeURIComponent(JSON.stringify(args));
 dialog.onclose=()=>{audio.play();post('user_interact');}
 ['ended', 'pause', 'playing'].map(on => audio.addEventListener(on, () => post('player_' + on)));
 let mediaSource, sourceBuffer;
 const on = {// event from VSCode
     async open(item) {
-        img.src = `https://e-cdns-images.dzcdn.net/images/cover/${item.md5_image}/1000x1000-000000-80-0-0.jpg`;
         mediaSource = new window.MediaSource();
         audio.src = window.URL.createObjectURL(mediaSource);
         await new Promise(then => mediaSource.onsourceopen = () => then());
@@ -33,12 +37,32 @@ const on = {// event from VSCode
     close() { mediaSource.endOfStream() },
     play() { audio.play().catch(e=>post('error', e)) },
     pause() { audio.pause() },
-    state(state, updates=[]) { }
+    state(state, updates=[]) {
+        if (updates.includes('current')) {
+            title.innerText = state.current.title;
+            artists.replaceChildren(...state.current.artists.map(artist=>el('a',{href:cmd("dzr.add", `/artist/${artist.id}`, artist.name)},[new Text(artist.name)])));
+            img.src = `https://e-cdns-images.dzcdn.net/images/cover/${state.current.md5_image}/1000x1000-000000-80-0-0.jpg`;
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: state.current.title,
+                artist: state.current.artists.map(a=>a.name).join(),
+                album: 'dzr',
+                artwork: [{ src: img.src, sizes: "1000x1000", type: "image/jpg" }]
+            });
+        }
+    }
 };
 window.addEventListener('message', ({ data: [cmd,...args] }) => {
     if (!on[cmd]) return console.log("bad message:" + JSON.stringify([cmd,...args]));
     on[cmd](...args);
 });
-
+navigator.mediaSession.setActionHandler("play", on.play);
+navigator.mediaSession.setActionHandler("pause", on.pause);
+navigator.mediaSession.setActionHandler("nexttrack", ()=>post('user_next'))
+//navigator.mediaSession.setActionHandler("previoustrack", ()=>{})
 </script>
-<style>dialog::backdrop {background-color: rgba(0,0,0,.9);}</style>
+<style>
+    a:not(:hover){text-decoration: none;}
+    dialog::backdrop {
+        background-color: rgba(0, 0, 0, .9);
+    }
+</style>

@@ -2,7 +2,7 @@
 	"name": "dzr",
 	"displayName": "DZR player",
 	"description": "deezer.com player",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"publisher": "yne",
 	"engines": {
 		"vscode": "^1.73.0"
@@ -45,20 +45,26 @@
 			},
 			{
 				"category": "dzr",
-				"command": "dzr.next",
+				"command": "dzr.load",
 				"title": "Play next",
 				"icon": "$(chevron-right)"
 			},
 			{
 				"category": "dzr",
-				"command": "dzr.loopAll",
-				"title": "Loop all Enable",
+				"command": "dzr.loopQueue",
+				"title": "Loop Queue",
 				"icon": "$(sync)"
 			},
 			{
 				"category": "dzr",
+				"command": "dzr.loopTrack",
+				"title": "Loop Track",
+				"icon": "$(redo)"
+			},
+			{
+				"category": "dzr",
 				"command": "dzr.loopOff",
-				"title": "Loop all Disable",
+				"title": "Loop Disabled",
 				"icon": "$(sync-ignored)"
 			},
 			{
@@ -70,20 +76,20 @@
 			{
 				"category": "dzr",
 				"command": "dzr.remove",
-				"title": "Queue Remove",
+				"title": "Queue Remove Track",
 				"icon": "$(close)"
 			},
 			{
 				"category": "dzr",
 				"command": "dzr.removeAt",
-				"title": "Queue Remove",
+				"title": "Queue Remove Track",
 				"icon": "$(close)"
 			},
 			{
 				"category": "dzr",
 				"command": "dzr.clear",
-				"title": "Queue Clear",
-				"icon": "$(clear-all)"
+				"title": "Queue Remove All",
+				"icon": "$(close)"
 			},
 			{
 				"category": "dzr",
@@ -95,19 +101,34 @@
 		"menus": {
 			"view/title": [
 				{
+					"when": "view == dzr.queue",
+					"group": "navigation@0",
+					"command": "dzr.add"
+				},
+				{
 					"when": "view == dzr.queue && dzr.queue!=''",
 					"group": "navigation@1",
 					"command": "dzr.clear"
 				},
 				{
 					"when": "view == dzr.queue && dzr.queue!=''",
-					"group": "navigation@2",
+					"group": "navigation@1",
 					"command": "dzr.shuffle"
 				},
 				{
-					"when": "view == dzr.queue",
-					"group": "navigation@3",
-					"command": "dzr.add"
+					"when": "view == dzr.queue && dzr.queue!='' && dzr.looping == 'off'",
+					"group": "navigation@2",
+					"command": "dzr.loopQueue"
+				},
+				{
+					"when": "view == dzr.queue && dzr.queue!='' && dzr.looping == 'queue'",
+					"group": "navigation@2",
+					"command": "dzr.loopTrack"
+				},
+				{
+					"when": "view == dzr.queue && dzr.queue!='' && dzr.looping == 'track'",
+					"group": "navigation@2",
+					"command": "dzr.loopOff"
 				}
 			],
 			"view/item/context": [
@@ -138,9 +159,137 @@
 					"description": "Persistent track queue"
 				},
 				"dzr.looping": {
-					"type": "boolean",
-					"default": false,
+					"type": "string",
+					"enum": ["queue", "track", "off"],
+					"default": "queue",
 					"description": "Queue looping"
+				},
+				"dzr.menus": {
+					"type": "object",
+					"description": "API tree (this they endpoint are not RESTful)",
+					"default": {
+						"_": [
+							{
+								"path": "search/track?q=",
+								"label": "$(play-circle) track search"
+							},
+							{
+								"path": "search/artist?q=",
+								"label": "$(person) artist search"
+							},
+							{
+								"path": "search/album?q=",
+								"label": "$(issues) album search"
+							},
+							{
+								"path": "search/playlist?q=",
+								"label": "$(list-unordered) playlist search"
+							},
+							{
+								"path": "search/user?q=",
+								"label": "$(account) user search"
+							},
+							{
+								"path": "search/radio?q=",
+								"label": "$(broadcast) radio search"
+							},
+							{
+								"path": "genre",
+								"label": "$(telescope) explore"
+							},
+							{
+								"path": "radio",
+								"label": "$(broadcast) radios list"
+							},
+							{
+								"path": "user/0",
+								"label": "$(account) user id"
+							}
+						],
+						"_artist_0": [
+							{
+								"path": "/top?limit=50",
+								"label": "$(star) Top Tracks"
+							},
+							{
+								"path": "/albums",
+								"label": "$(issues) Albums"
+							},
+							{
+								"path": "/related",
+								"label": "$(person) Similar Artists"
+							},
+							{
+								"path": "/radio",
+								"label": "$(broadcast) Flow"
+							},
+							{
+								"path": "/playlists",
+								"label": "$(list-unordered) Playlists"
+							}
+						],
+						"_user_0": [
+							{
+								"path": "/playlists",
+								"label": "$(list-unordered) Playlists"
+							},
+							{
+								"path": "/tracks",
+								"label": "$(play-circle) Favorite Tracks"
+							},
+							{
+								"path": "/albums",
+								"label": "$(issues) Favorite Albums"
+							},
+							{
+								"path": "/artists",
+								"label": "$(person) Favorite Artists"
+							},
+							{
+								"path": "/flow",
+								"label": "$(broadcast) Flow"
+							},
+							{
+								"path": "/charts",
+								"label": "$(play-circle) Charts"
+							}
+						],
+						"_genre_0": [
+							{
+								"path": "/radios",
+								"label": "$(broadcast) radios"
+							},
+							{
+								"path": "/artists",
+								"label": "$(person) Artists"
+							}
+						],
+						"_radio_0": [
+							{
+								"path": "/tracks",
+								"label": "$(list-unordered) tracks"
+							}
+						],
+						"_album_0": [
+							{
+								"path": "/tracks",
+								"label": "$(list-unordered) tracks"
+							}
+						]
+					}
+				},
+				"dzr.type2icon": {
+					"type": "object",
+					"description": "VSCode picker icon to display according to item type",
+					"default": {
+						"track": "$(play-circle) ",
+						"artist": "$(person) ",
+						"album": "$(issues) ",
+						"playlist": "$(list-unordered)",
+						"radio": "$(broadcast) ",
+						"genre": "$(telescope) ",
+						"user": "$(account) "
+					}
 				}
 			}
 		},
@@ -149,9 +298,7 @@
 				{
 					"id": "dzr.queue",
 					"name": "Player Queue",
-					"icon": "play",
-					"contextualTitle": "Queue",
-					"whenn": "dzr.ready"
+					"icon": "play"
 				}
 			]
 		}

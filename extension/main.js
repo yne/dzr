@@ -4,17 +4,8 @@ const crypto = require('crypto');
 const https = require('https');
 const conf = vscode.workspace.getConfiguration("dzr");
 const location = vscode.ProgressLocation.Notification;
-const type2icon = {
-	track: '$(play-circle) ',
-	artist: '$(person) ',
-	album: '$(issues) ',
-	playlist: '$(list-unordered)',
-	radio: '$(broadcast) ',
-	genre: '$(telescope) ',
-	user: '$(account) ',
-};
 const hhmmss = (s) => (new Date(s * 1000)).toISOString().slice(11, 19).replace(/^00:/, '');
-const wait = (ms=1000) => new Promise(resolve => setTimeout(resolve, ms));
+const wait = (ms = 1000) => new Promise(resolve => setTimeout(resolve, ms));
 // still no fetch() in 2023 ?
 const fetch = (url, opt, data) => new Promise((resolve, reject) => {
 	const chunks = [], req = https.request(url, opt, res => {
@@ -29,42 +20,13 @@ const fetch = (url, opt, data) => new Promise((resolve, reject) => {
 // - not restful, so we can't infer it structure
 // - /track/:id gives contributors but /search/track?q= don't
 // - inconsistent listing structure (/playlist/:id => tracks.data, sometimes=>data, sometimes data.tracks)
-const menus = {
-	_: [
-		{ path: 'search/track?q=', label: '$(play-circle) track search' },
-		{ path: 'search/artist?q=', label: '$(person) artist search' },
-		{ path: 'search/album?q=', label: '$(issues) album search' },
-		{ path: 'search/playlist?q=', label: '$(list-unordered) playlist search' },
-		{ path: 'search/user?q=', label: '$(account) user search' },
-		{ path: 'search/radio?q=', label: '$(broadcast) radio search' },
-		{ path: 'genre', label: '$(telescope) explore' },
-		{ path: 'radio', label: '$(broadcast) radios list' },
-		{ path: 'user/0', label: '$(account) user id' },
-	],
-	_artist_0: [
-		{ path: '/top?limit=50', label: '$(play-circle) Top Tracks' },
-		{ path: '/albums', label: '$(issues) Albums' },
-		{ path: '/related', label: '$(person) Similar Artists' },
-		{ path: '/radio', label: '$(broadcast) Flow' },
-		{ path: '/playlists', label: '$(list-unordered) Playlists' }
-	],
-	_user_0: [
-		{ path: '/playlists', label: '$(list-unordered) Playlists' },
-		{ path: '/tracks', label: '$(play-circle) Favorite Tracks' },
-		{ path: '/albums', label: '$(issues) Favorite Albums' },
-		{ path: '/artists', label: '$(person) Favorite Artists' },
-		{ path: '/flow', label: '$(broadcast) Flow' },
-		{ path: '/charts', label: '$(play-circle) Charts' },
-	],
-	_genre_0: [{ label: '/radios' }, { label: '/artists' }],
-	_radio_0: [{ label: '/tracks' }],
-	_album_0: [{ label: '/tracks' }],
-}
-// browse can be : user query / list(static) / list(fetch)
+// browse can be called from: user query / self list(from static menu) / self list(from fetch result)
 async function browse(url_or_event, label) {
+	console.log(url_or_event);
 	try {
 		const url = typeof (url_or_event) == "string" ? url_or_event : '/';
 		const id = url.replace(/\d+/g, '0').replace(/[^\w]/g, '_');
+		const menus = conf.get('menus');
 		if (url.endsWith('=') || url.endsWith('/0')) { // query step
 			const input = await vscode.window.showInputBox({ title: label });
 			if (!input) return;
@@ -72,13 +34,14 @@ async function browse(url_or_event, label) {
 		} else if (menus[id]) { // menu step
 			const pick = menus[id].length > 1 ? await vscode.window.showQuickPick(menus[id], { title: label || url }) : menus[id][0];
 			if (!pick) return;
-			return await browse(url + (pick.path || pick.label), pick.label);
+			return await browse(url + pick.path, pick.label);
 		} else { // fetch step
 			const json = JSON.parse(await fetch("https://api.deezer.com" + url)); // todo: json.next?
 			console.debug(json);
 			const data = json.data?.tracks || json.data || json.tracks?.data;
 			const picked = url.match(/\/(playlist|album)\//);
 			const canPickMany = data.find(item => item.type == "track");
+			const type2icon = conf.get('type2icon');
 			const choices = data.map(entry => ({
 				...entry, picked,
 				label: (type2icon[entry.type] || '') + (entry.title_short || entry.name || entry.title),
@@ -113,7 +76,7 @@ const with_url = async (songs) => songs?.length ? await vscode.window.withProgre
 			id, md5_image, duration,
 			title: title_short?.replace(/ ?\(feat.*?\)/, '') || title,
 			version: title_version || version,
-			artists: artists??(contributors || [artist])?.map(({ id, name }) => ({ id, name })),
+			artists: artists ?? (contributors || [artist])?.map(({ id, name }) => ({ id, name })),
 			size: +SNG_NFO.data[i].FILESIZE,
 			expire: SNG_NFO.data[i].TRACK_TOKEN_EXPIRE,
 			url: URL_NFO.data[i].media?.[0]?.sources?.[0]?.url
@@ -122,7 +85,7 @@ const with_url = async (songs) => songs?.length ? await vscode.window.withProgre
 }) : [];
 
 class DzrWebView { // can't Audio() in VSCode, we need a webview
-	statuses = ['dzr.play', 'dzr.show', 'dzr.next'].map((command) => {
+	statuses = ['dzr.play', 'dzr.show', 'dzr.load'].map((command) => {
 		const item = vscode.window.createStatusBarItem(command, vscode.StatusBarAlignment.Left, 10000);
 		item.color = new vscode.ThemeColor('statusBarItem.prominentBackground');
 		item.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
@@ -132,7 +95,7 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 		return item;
 	});
 	panel = null;
-	#state = { };
+	#state = {};
 	state = new Proxy(this.#state, {
 		set: (target, key, value) => {
 			target[key] = value;
@@ -149,31 +112,26 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 
 	constructor() {
 		this.initAckSemaphore();
-		this.state.index = -1;
-		this.state.playing = false;
-		this.state.ready = false;
-		this.state.current = null;
-		this.state.looping = conf.get('loop');
-		this.state.queue = conf.get('queue');
+		this.state.queue = conf.get('queue'); // first is best
+		this.state.looping = conf.get('looping');
 	}
-
 	renderStatus() {
-		const label = this.state.current ? `${this.state.current.title} - ${item.artists?.map(a => a.name).join()}` : '';
+		const index = this.state.queue?.indexOf(this.state.current);
+		const label = this.state.current ? `${this.state.current.title} - ${this.state.current.artists?.map(a => a.name).join()}` : '';
 		this.statuses[0].command = this.state.playing ? 'dzr.pause' : 'dzr.play';
 		this.statuses[0].text = this.state.ready && (this.state.playing ? "$(debug-pause)" : "$(play)");
 		this.statuses[1].tooltip = this.state.ready ? label : "Initiate interaction first";
 		this.statuses[1].text = this.state.ready ? label.length < 20 ? label : (label.slice(0, 20) + '…') : "$(play)"
-		this.statuses[2].text = this.state.ready && this.state.queue.length ? `${this.state.index + 1}/${this.state.queue.length} $(chevron-right)` : null;//debug-step-over
-		this.treeView.description = this.state.queue?.length ? `${this.state.index + 1}/${this.state.queue.length}` : 'empty';
-		this.treeView.message=this.state.queue?.length ? null : "Empty Queue. Add tracks using the + button";
+		this.statuses[2].text = this.state.ready && this.state.queue.length ? `${index + 1 || '?'}/${this.state.queue.length} $(chevron-right)` : null;//debug-step-over
+		this.treeView.description = (this.state.queue?.length ? `${index + 1 || '?'}/${this.state.queue.length}` : '') + ` loop:${this.state.looping}`;
+		this.treeView.message = this.state.queue?.length ? null : "Empty Queue. Add tracks to queue using '+'";
 	}
 	async show(htmlUri) {
 		if (this.panel) return this.panel.reveal(vscode.ViewColumn.One);
 		this.panel = vscode.window.createWebviewPanel('dzr.player', 'Player', vscode.ViewColumn.One, {
 			enableScripts: true,
 			enableCommandUris: true,
-			enableFindWidget: true,
-			retainContextWhenHidden: true
+			retainContextWhenHidden: true,
 		});
 		this.panel.webview.html = (await vscode.workspace.fs.readFile(htmlUri)).toString();
 		this.panel.webview.onDidReceiveMessage((action, ...args) => this[action] ? this[action](...args) : this.badAction(action));
@@ -189,8 +147,9 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 	}
 	player_playing() { this.state.ready = this.state.playing = true; }
 	player_pause() { this.state.playing = false; }
-	player_ended() { vscode.commands.executeCommand('dzr.next'); }
+	player_ended() { vscode.commands.executeCommand('dzr.load', null); }
 	user_interact() { this.state.ready = true; }
+	user_next() { vscode.commands.executeCommand('dzr.load'); }
 	error(msg) { vscode.window.showErrorMessage(msg); }
 	badAction(action) { console.error(`unHandled action "${action}" from webview`); }
 	// tree
@@ -206,7 +165,7 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 		label: item.title,
 		description: item.artists.map(a => a.name).join(),
 		contextValue: 'dzr.track',
-		command: { title: 'Play', command: 'dzr.next', tooltip: 'Play', arguments: [this.state.queue.indexOf(item)] },
+		command: { title: 'Play', command: 'dzr.load', tooltip: 'Play', arguments: [this.state.queue.indexOf(item)] },
 		tooltip: hhmmss(item.duration)//JSON.stringify(item, null, 2),
 	})
 	getChildren = () => this.state.queue
@@ -241,9 +200,10 @@ exports.activate = async function (/**@type {vscode.ExtensionContext}*/ context)
 		vscode.commands.registerCommand('dzr.show', () => dzr.show(htmlUri)),
 		vscode.commands.registerCommand("dzr.play", () => dzr.post('play')),
 		vscode.commands.registerCommand("dzr.pause", () => dzr.post('pause')),
-		vscode.commands.registerCommand("dzr.loopAll", () => dzr.looping = true),
-		vscode.commands.registerCommand("dzr.loopOff", () => dzr.looping = false),
-		vscode.commands.registerCommand("dzr.add", async (path) => dzr.state.queue = [...dzr.state.queue, ...await with_url(await browse(path)) || []]),
+		vscode.commands.registerCommand("dzr.loopQueue", () => dzr.state.looping = "queue"),
+		vscode.commands.registerCommand("dzr.loopTrack", () => dzr.state.looping = "track"),
+		vscode.commands.registerCommand("dzr.loopOff", () => dzr.state.looping = "off"),
+		vscode.commands.registerCommand("dzr.add", async (path, label) => dzr.state.queue = [...dzr.state.queue, ...await with_url(await browse(path, label)) || []]),
 		vscode.commands.registerCommand("dzr.remove", async (item, items) => (items || [item]).map(i => vscode.commands.executeCommand('dzr.removeAt', dzr.state.queue.indexOf(i)))),
 		vscode.commands.registerCommand("dzr.removeAt", async (index) => index >= 0 && (dzr.state.queue = [...dzr.state.queue.slice(0, index), ...dzr.state.queue.slice(index + 1)])),
 		vscode.commands.registerCommand("dzr.clear", async () => dzr.state.queue = []),
@@ -255,26 +215,27 @@ exports.activate = async function (/**@type {vscode.ExtensionContext}*/ context)
 			}
 			dzr.state.queue = shuffle;
 		}),
-		vscode.commands.registerCommand("dzr.next", async (pos = dzr.state.index + 1) => {
-			dzr.state.index = (pos >= dzr.state.queue.length) ? 0 : pos;
-			const item = dzr.state.queue[dzr.state.index];
-			item && vscode.commands.executeCommand('dzr.load', item);
-		}),
-		vscode.commands.registerCommand("dzr.load", async (item) => {
+		vscode.commands.registerCommand("dzr.load", async (pos) => { //pos=null if player_end / pos=undefine if user click
+			pos = pos ?? dzr.state.queue.indexOf(dzr.state.current) + (dzr.state.looping=='track' ? 0 : 1);
+			if (!dzr.state.queue[pos]) { // out of bound track
+				if (dzr.state.looping == 'off') return; // don't loop if unwanted
+				pos = 0; // loop position if looping
+			}
 			if (!dzr.state.ready) {
 				vscode.commands.executeCommand('dzr.show');
 				while (!dzr.state.ready) await wait();
 			}
-			if (item.expire < (new Date()/1000)) {
-				with_url(dzr.state.queue);//TODO: hope item is now up to date
+			dzr.state.current = dzr.state.queue[pos];
+			if (dzr.state.current.expire < (new Date() / 1000)) {
+				dzr.state.queue = await with_url(dzr.state.queue);//TODO: hope item is now up to date
 			}
 			const hex = (str) => str.split('').map(c => c.charCodeAt(0))
-			const md5 = hex(crypto.createHash('md5').update(`${item.id}`).digest('hex'));
+			const md5 = hex(crypto.createHash('md5').update(`${dzr.state.current.id}`).digest('hex'));
 			const key = Buffer.from(hex(conf.get('cbc')).map((c, i) => c ^ md5[i] ^ md5[i + 16]));
 			const iv = Buffer.from([0, 1, 2, 3, 4, 5, 6, 7]);
 			const stripe = 2048;//TODO:use .pipe() API https://codereview.stackexchange.com/questions/57492/
-			dzr.post('open', item);
-			const buf_enc = await fetch(item.url);
+			dzr.post('open', dzr.state.current);
+			const buf_enc = await fetch(dzr.state.current.url);
 			for (let pos = 0; pos < buf_enc.length; pos += stripe) {
 				if ((pos >> 11) % 3) continue;
 				const ciph = crypto.createDecipheriv('bf-cbc', key, iv).setAutoPadding(false)
