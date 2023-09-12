@@ -293,12 +293,21 @@
 				}
 			}
 		},
+		"viewsContainers": {
+			"activitybar": [
+			  {
+				"id": "dzr",
+				"title": "dzr",
+				"icon": "logo.svg"
+			  }
+			]
+		},
 		"views": {
-			"explorer": [
+			"dzr": [
 				{
 					"id": "dzr.queue",
 					"name": "Player Queue",
-					"icon": "play"
+					"icon": "logo.svg"
 				}
 			]
 		}

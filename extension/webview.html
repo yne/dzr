@@ -62,7 +62,6 @@ navigator.mediaSession.setActionHandler("nexttrack", ()=>post('user_next'))
 </script>
 <style>
     a:not(:hover){text-decoration: none;}
-    dialog::backdrop {
-        background-color: rgba(0, 0, 0, .9);
-    }
+    img:not([src]){opacity: 0;}
+    dialog::backdrop {background-color: rgba(0, 0, 0, .9);}
 </style>

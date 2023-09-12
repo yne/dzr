@@ -27,12 +27,13 @@ async function browse(url_or_event, label) {
 		const url = typeof (url_or_event) == "string" ? url_or_event : '/';
 		const id = url.replace(/\d+/g, '0').replace(/[^\w]/g, '_');
 		const menus = conf.get('menus');
+		const title = (label || '').replace(/\$\(.+?\)/g, '');
 		if (url.endsWith('=') || url.endsWith('/0')) { // query step
-			const input = await vscode.window.showInputBox({ title: label });
+			const input = await vscode.window.showInputBox({ title });
 			if (!input) return;
-			return await browse(url.replace(/0$/, '') + input, label);
+			return await browse(url.replace(/0$/, '') + input, `${label}: ${input}`);
 		} else if (menus[id]) { // menu step
-			const pick = menus[id].length > 1 ? await vscode.window.showQuickPick(menus[id], { title: label || url }) : menus[id][0];
+			const pick = menus[id].length > 1 ? await vscode.window.showQuickPick(menus[id], { title: title || url }) : menus[id][0];
 			if (!pick) return;
 			return await browse(url + pick.path, pick.label);
 		} else { // fetch step
@@ -48,7 +49,7 @@ async function browse(url_or_event, label) {
 				description: [entry.artist?.name, entry.title_version, entry.nb_tracks].join(' '),
 				path: `/${entry.type}/${entry.id}`,
 			}));
-			const picks = await vscode.window.showQuickPick(choices, { title: label || url, canPickMany });
+			const picks = await vscode.window.showQuickPick(choices, { title: title || url, canPickMany });
 			if (!picks) return;
 			return canPickMany ? picks : await browse(picks.path, picks.label);
 		}
@@ -56,7 +57,7 @@ async function browse(url_or_event, label) {
 }
 /* songs may came from API (full info) or storage (light info) */
 const with_url = async (songs) => songs?.length ? await vscode.window.withProgress({ title: 'Fetching Song Info...', location }, async (progress) => {
-	try {
+	try { // take 7s (with, or without agent)
 		const next = (val) => (progress.report({ increment: 100 / 4 }), val);
 		const gw = async (method, sid, api_token = "", opt = {}, data) => JSON.parse(await fetch(`${base}&method=${method}&api_token=${api_token}`,
 			{ ...opt, headers: { Cookie: `sid=${sid}`, ...opt?.headers } }, data)).results;
@@ -126,13 +127,14 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 		this.treeView.description = (this.state.queue?.length ? `${index + 1 || '?'}/${this.state.queue.length}` : '') + ` loop:${this.state.looping}`;
 		this.treeView.message = this.state.queue?.length ? null : "Empty Queue. Add tracks to queue using '+'";
 	}
-	async show(htmlUri) {
+	async show(htmlUri, iconPath) {
 		if (this.panel) return this.panel.reveal(vscode.ViewColumn.One);
 		this.panel = vscode.window.createWebviewPanel('dzr.player', 'Player', vscode.ViewColumn.One, {
 			enableScripts: true,
 			enableCommandUris: true,
 			retainContextWhenHidden: true,
 		});
+		this.panel.iconPath = iconPath;
 		this.panel.webview.html = (await vscode.workspace.fs.readFile(htmlUri)).toString();
 		this.panel.webview.onDidReceiveMessage((action, ...args) => this[action] ? this[action](...args) : this.badAction(action));
 		this.panel.onDidDispose(() => this.state.ready = this.panel = null);
@@ -196,8 +198,9 @@ exports.activate = async function (/**@type {vscode.ExtensionContext}*/ context)
 	});
 	const dzr = new DzrWebView();
 	const htmlUri = vscode.Uri.joinPath(context.extensionUri, 'webview.html');
+	const iconUri = vscode.Uri.joinPath(context.extensionUri, 'logo.svg'); //same for light+dark
 	context.subscriptions.push(...dzr.statuses, dzr.treeView,
-		vscode.commands.registerCommand('dzr.show', () => dzr.show(htmlUri)),
+		vscode.commands.registerCommand('dzr.show', () => dzr.show(htmlUri, iconUri)),
 		vscode.commands.registerCommand("dzr.play", () => dzr.post('play')),
 		vscode.commands.registerCommand("dzr.pause", () => dzr.post('pause')),
 		vscode.commands.registerCommand("dzr.loopQueue", () => dzr.state.looping = "queue"),
@@ -216,7 +219,7 @@ exports.activate = async function (/**@type {vscode.ExtensionContext}*/ context)
 			dzr.state.queue = shuffle;
 		}),
 		vscode.commands.registerCommand("dzr.load", async (pos) => { //pos=null if player_end / pos=undefine if user click
-			pos = pos ?? dzr.state.queue.indexOf(dzr.state.current) + (dzr.state.looping=='track' ? 0 : 1);
+			pos = pos ?? dzr.state.queue.indexOf(dzr.state.current) + (dzr.state.looping == 'track' ? 0 : 1);
 			if (!dzr.state.queue[pos]) { // out of bound track
 				if (dzr.state.looping == 'off') return; // don't loop if unwanted
 				pos = 0; // loop position if looping

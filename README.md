@@ -1,89 +1,65 @@
 ![dzr logo](.github/.logo.svg)
 
-# DZR: the command line deezer.com player [![ci](https://github.com/yne/dzr/actions/workflows/ci.yml/badge.svg)](https://github.com/yne/dzr/actions/workflows/ci.yml)
+# DZR: the command line deezer.com player
 
-> ⚠️ For [legal reasons](https://github.com/github/dmca/blob/master/2021/02/2021-02-10-deezer.md) this project
-> - does not contain any track decryption key
-> - does not cache any tracks on your machine
+## Features
 
-## Preview
+- Cross-platform support: Linux, *BSD, MacOS, Android, Windows+WSL
+- Little dependencies: `curl`, `jq`, `dialog`, `openssl` (`openssl-tool` in Android)
+- Real-time Lyrics display
+- Web interface support (see [dzr](https://github.com/topics/dzr)-tagged frontend)
+- ID3v2 tag injector from Deezer metadata (cover, artist, ...)
+- Play without storing/caching on your machine for [legal reasons](https://github.com/github/dmca/blob/master/2021/02/2021-02-10-deezer.md)
+- No private deezer key in the source (auto-extracted from web player, also for legal reasons)
+- VSCode extension [VSIX](https://github.com/yne/dzr/releases) experimental port
+
+## Preview (CLI)
+
 [![asciicast](https://asciinema.org/a/406758.svg)](https://asciinema.org/a/406758)
 
-## Dependencies
+## Preview (VSIX)
 
-- `mpv` for playback (because of `PLAYER="mpv -"` default env variable)
-- `curl` for HTTP query
-- `jq` for API parsing
-- `dialog` for TUI
-- `openssl` (or `openssl-tool` in Android) for track decryption
-
-## Compatibility
-
-- Linux and {Free,Open}BSD
-- Android (using [Termux](https://termux.com/) from F-droid)
-- Window 10 (running dzr as CGI server from WSL and browsing http://127.0.0.1:8000 from Windows)
+![Screenshot](https://github.com/yne/dzr/assets/5113053/37b6cd26-8876-4d77-92bb-293ff248e21d)
 
 ## Install
 
-### From the AUR (Arch Linux)
+| Platform | command | version |
+|----------|---------|---------|
+| MacOS + [brew](https://formulae.brew.sh/formula/dzr)       | `brew install dzr` | ![](https://repology.org/badge/version-for-repo/homebrew/dzr.svg?header=)
+| Arch Linux + [AUR](https://aur.archlinux.org/packages/dzr) | `yay -S dzr`       | ![](https://repology.org/badge/version-for-repo/aur/dzr.svg?header=)
+| Gentoo + [GURU](https://github.com/gentoo/guru)            | `emerge --ask dzr` | ![](https://repology.org/badge/version-for-repo/gentoo_ovl_guru/dzr.svg?header=)
+| Ubuntu + [snap](https://snapcraft.io/dzr) | `snap install --edge dzr` | [Help Me](https://github.com/yne/dzr/issues/25)
+| Android + [Termux](https://f-droid.org/packages/com.termux/) | `curl -sL github.com/yne/dzr/archive/master.tar.gz \| tar xzf -` <br> `sudo mv dzr-master/dzr* /usr/local/bin` | [![](https://img.shields.io/badge/-tar.gz-40c010?logo=hackthebox)](https://github.com/yne/dzr/archive/master.tar.gz)
+| VSCode | `code --install-extension ./path/tos/dzr-x.y.z.vsix` | [![](https://img.shields.io/badge/VSIX-4c1?logo=visualstudiocode)](https://github.com/yne/dzr/releases)
+## Usage
 
 ```sh
-yay -S dzr
-```
+# browse api.deezer.com
+dzr
 
-### From [GURU](https://github.com/gentoo/guru) (Gentoo)
+# browse a specific api.deezer.com url
+dzr /artist/860
 
-```sh
-emerge --ask dzr
-```
+# play a specific track
+dzr /track/1043317462
 
-### From sources
+# use a custom PLAYER (mpg123 v1.31+ is a lightweight alternative)
+PLAYER="mpg123 -" dzr
 
-Save source into a `dzr-master` folder, then copy into /usr/local/bin :
+# inject deezer ID3v2 into MP3 (require eyeD3) and rename it as $ARTIST - $TITLE.mp3
+dzr-id3 https://deezer.com/track/1043317462 tagme.mp3
 
-```bash
-curl -sL github.com/yne/dzr/archive/master.tar.gz | tar xzf -
-sudo mv dzr-master/dzr* /usr/local/bin
-```
+# show track lyrics as srt
+dzr-srt https://deezer.com/track/14408104
 
-## Usage Examples
+# play track with it lyrics
+PLAYER='dzr-srt $id > .srt ; mpv --sub-file=.srt -' dzr /track/14408104
 
-```sh
-dzr             # welcome screen
-dzr /artist/860 # browse deezer.com/en/artist/860
-```
-
-## Automatic ID3v2 Tagging
-
-Use `dzr-id3` to rename (as `$ARTIST - $TITLE.mp3`) and tag a given MP3 using it deezer track id
-
-```sh
-# the following examples are all equivalent
-dzr-id3 1043317462 daylight.mp3
-dzr-id3 /track/1043317462 daylight.mp3
-dzr-id3 https://deezer.com/en/track/1043317462 daylight.mp3
-```
-
-## Real time Lyrics
-
-Use `dzr-srt` to extract lyrics of the current track and pass it to mpv as --sub-file :
-
-```sh
+# play track with it srt (using non-POSIX compliant process substitution)
 PLAYER='mpv --sub-file=<(dzr-srt $id) -' dzr /track/14408104
-```
 
-## HTTP/Web interface
-
-In addition to it command line interface, `dzr` also support being invoked from a cgi server :
-
-```sh
-mkdir -p cgi-bin
-cp dzr* ./cgi-bin/
+# install dzr into ./cgi-bin/. Then serve it
+mkdir -p ./cgi-bin/ && install dzr* ./cgi-bin/
 python3 -m http.server --cgi
+open http://127.0.0.1:8000/cgi-bin/dzr?6113114
 ```
-
-You shall then be able to play any track over HTTP (ex: http://127.0.0.1:8000/cgi-bin/dzr?6113114 )
-
-A **basic** web interface is also available on http://127.0.0.1:8000
-
-Feel free to create your own frontend an publish it as a new repository (not as a dzr fork) with the [dzr](https://github.com/topics/dzr) tag.
