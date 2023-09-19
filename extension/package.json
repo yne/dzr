@@ -8,8 +8,12 @@
 		"vscode": "^1.73.0"
 	},
 	"main": "./main.js",
+	"extensionKind": [
+		"ui",
+		"workspace"
+	],
 	"activationEvents": [
-		"*"
+		"onStartupFinished"
 	],
 	"contributes": {
 		"viewsWelcome": [
