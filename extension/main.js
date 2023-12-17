@@ -164,11 +164,11 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 	/**@returns {vscode.TreeItem} */
 	getTreeItem = (item) => ({
 		iconPath: vscode.ThemeIcon.File,
-		label: item.title,
-		description: item.artists.map(a => a.name).join(),
+		label: item.title + ' - ' + item.artists.map(a => a.name).join(),
+		description: hhmmss(item.duration) + " " + (item.version||''),
 		contextValue: 'dzr.track',
 		command: { title: 'Play', command: 'dzr.load', tooltip: 'Play', arguments: [this.state.queue.indexOf(item)] },
-		tooltip: hhmmss(item.duration)//JSON.stringify(item, null, 2),
+		//tooltip: JSON.stringify(item, null, 2),
 	})
 	getChildren = () => this.state.queue
 	async handleDrag(sources, treeDataTransfer, token) {
@@ -203,6 +203,7 @@ exports.activate = async function (/**@type {vscode.ExtensionContext}*/ context)
 		vscode.commands.registerCommand('dzr.show', () => dzr.show(htmlUri, iconUri)),
 		vscode.commands.registerCommand("dzr.play", () => dzr.post('play')),
 		vscode.commands.registerCommand("dzr.pause", () => dzr.post('pause')),
+		vscode.commands.registerCommand("dzr.href", (track) => vscode.env.openExternal(vscode.Uri.parse(`https://deezer.com/track/${track.id}`))),
 		vscode.commands.registerCommand("dzr.loopQueue", () => dzr.state.looping = "queue"),
 		vscode.commands.registerCommand("dzr.loopTrack", () => dzr.state.looping = "track"),
 		vscode.commands.registerCommand("dzr.loopOff", () => dzr.state.looping = "off"),

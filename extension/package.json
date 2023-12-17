@@ -15,6 +15,11 @@
 	"activationEvents": [
 		"onStartupFinished"
 	],
+	"capabilities": {
+		"untrustedWorkspaces": {
+			"supported": true
+		}
+	},
 	"contributes": {
 		"viewsWelcome": [
 			{
@@ -40,6 +45,13 @@
 				"command": "dzr.play",
 				"title": "Play",
 				"icon": "$(debug-run)"
+			},
+			{
+				"category": "dzr",
+				"command": "dzr.href",
+				"title": "Open Web",
+				"when": "false",
+				"icon": "$(link-external)"
 			},
 			{
 				"category": "dzr",
@@ -81,12 +93,14 @@
 				"category": "dzr",
 				"command": "dzr.remove",
 				"title": "Queue Remove Track",
+				"when": "false",
 				"icon": "$(close)"
 			},
 			{
 				"category": "dzr",
 				"command": "dzr.removeAt",
 				"title": "Queue Remove Track",
+				"when": "false",
 				"icon": "$(close)"
 			},
 			{
@@ -139,12 +153,17 @@
 				{
 					"group": "inline",
 					"command": "dzr.remove",
-					"when": "viewItem == dzr.track"
+					"when": "viewItem == dzr.track && !listMultiSelection"
+				},
+				{
+					"group": "navigation",
+					"command": "dzr.href",
+					"when": "viewItem == dzr.track && !listMultiSelection"
 				},
 				{
 					"group": "navigation",
 					"command": "dzr.remove",
-					"when": "viewItem == dzr.track"
+					"when": "viewItem == dzr.track && listMultiSelection"
 				}
 			]
 		},
@@ -164,7 +183,11 @@
 				},
 				"dzr.looping": {
 					"type": "string",
-					"enum": ["queue", "track", "off"],
+					"enum": [
+						"queue",
+						"track",
+						"off"
+					],
 					"default": "queue",
 					"description": "Queue looping"
 				},
@@ -299,11 +322,11 @@
 		},
 		"viewsContainers": {
 			"activitybar": [
-			  {
-				"id": "dzr",
-				"title": "dzr",
-				"icon": "logo.svg"
-			  }
+				{
+					"id": "dzr",
+					"title": "dzr",
+					"icon": "logo.svg"
+				}
 			]
 		},
 		"views": {
