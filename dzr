@@ -1,19 +1,7 @@
 #!/bin/sh
 
-# CGI call handling, for example moving ./dzr* bin to ~/cgi-bin and running :
-#     python3 -m http.server --cgi
-# from your ~ (as non-root !) will reply to http://0.0.0.0:8000/cgi-bin/dzr?6113114,806027
 FETCH=${FETCH:-curl -s} # FETCH="wget -q -O -" or FETCH="curl -s -k"
 PLAYER=${PLAYER:-'mpv -'} # PLAYER="ffplay -"
-if [ "$REQUEST_METHOD" = "HEAD" ] ; then
-	printf 'Access-Control-Allow-Origin: *\ndzr-api: 0\n\n'
-elif [ "$REQUEST_METHOD" = "GET" ] ; then
-	printf "Cache-Control: max-age=31536000, immutable\nContent-Type: audio/mpeg\n\n"
-	echo "$QUERY_STRING" | xargs basename | xargs $0-url | while read url id; do
-		$FETCH "$url" | $0-dec $id
-	done
-fi
-[ ! -z "$REQUEST_METHOD" ] && exit
 
 # extraction + warning by charleywright, see: https://github.com/yne/dzr/issues/11
 unscramble(){ printf "${8}${16}${7}${15}${6}${14}${5}${13}${4}${12}${3}${11}${2}${10}${1}${9}";}
@@ -37,40 +25,37 @@ done
 
 # main
 API="api.deezer.com"
-DLG_LIST="dialog --keep-tite --output-fd 1 --menu $1: 0 0 0"
+DLG_LIST="dialog --keep-tite --output-fd 1 --no-tags --menu $1: 0 0 0"
 DLG_TEXT="dialog --keep-tite --output-fd 1 --inputbox $1: 0 0"
 FMT_LIST='(if .data then .data else .tracks.data end)[]|("/"+.type+"/"+(.id|tostring), (.title+.name+" "+.artist.name|gsub("\\x22";"")))'
 FMT_TRKS='"/track/"+([(if .data then .data else .tracks.data end)[]|select(.type=="track")|.id]|@csv)'
 FMT_FUNC='s@[,?].*@@;s@[^a-zA-Z0-9]\{1,\}@_@g;s@[0-9,]\{1,\}@0@g;s@_\{1,\}$@@'
-
-dzr()          { $DLG_LIST /search/track?q= 'by name' /search/artist?q= 'by name' /search/album?q= 'by name' /search/playlist?q= 'by name' /search/user?q= 'by name' /search/radio?q= 'by name' /genre 'list' /radio 'list' /user/0 'by id' ;} 
-dzr_genre_0()  { $DLG_LIST radios '' artists '' ;}
-dzr_radio_0()  { $DLG_LIST tracks '' fans '' ;}
-dzr_album_0()  { $DLG_LIST tracks '' fans '' ;}
-dzr_user_0()   { $DLG_LIST charts '' albums '' playlists '' flow '' tracks '' artists '' ;}
-dzr_artist_0() { $DLG_LIST top?limit=50 '' albums '' fans '' related '' radio '' playlists '' ;}
-dzr_default()  { $FETCH -H "Accept-Language: $LANG" "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST ▸ "play all /track/" ⇄ "shuf all /track/" ;} # TODO: .next
-play() { # receive /track/1,2,3 from stdin
-	xargs basename | xargs $0-url | ${1:-cat} | while read url id; do
-		$FETCH "$url" | $0-dec $id | eval ${PLAYER:-'mpv -'} || break # stop if Ctrl+C : $? = 4
+get()          { $DLG_LIST /search/track?q= Track /search/artist?q= Artist /search/album?q= Album /search/playlist?q= Playlist /search/user?q= User /user/0 UserID /search/radio?q= Radio /radio Radios /genre Genre;}
+get_genre_0()  { $DLG_LIST $url/radios Radios $url/artists Artists ;}
+get_radio_0()  { $DLG_LIST $url/tracks Tracks $url/fans Fans ;}
+get_album_0()  { $DLG_LIST $url/tracks Tracks $url/fans Fans ;}
+get_user_0()   { $DLG_LIST $url/charts Charts $url/albums Albums $url/playlists Playlists $url/flow Flow $url/tracks Tracks $url/artists Artists ;}
+get_artist_0() { $DLG_LIST $url/top?limit=50 Top50 $url/albums Albums $url/fans Fans $url/related Related $url/radio Radio $url/playlists Playlists ;}
+get_default()  { eval $DLG_LIST $($FETCH -H "Accept-Language: $LANG" "$API$1" | jq "$FMT_LIST") ;} # TODO: .next "'▸' 'play all /track/' '⇄' 'shuf all /track/'" 
+get_track_0()  { # support multi-ids /track/1,2,3 for token reuse
+	[ "$REQUEST_METHOD" = "GET" ] && http audio/mpeg
+	$0-url $@ | ${SHUF:-cat} | while read url id; do
+		$FETCH "$url" | $0-dec $id | eval ${PLAYER} || break # stop if Ctrl+C : $? = 4
 	done
 }
-for url in "$@"; do
-	FUNC=$(echo "dzr_$url" | sed "$FMT_FUNC") # path (/search/artist?q=x) to function (dzr_search_artist)
-	type $FUNC 1>/dev/null 2>/dev/null || FUNC=dzr_default
-	case $url in # catch url that need user input (query, id)
-		*=)  url="$url$($DLG_TEXT ''|jq -rR '.|@uri')" ;; # escaped query
-		*/0) url="$url$($DLG_TEXT ''|jq -rR '.|@uri')" ;; # escaped id
-		/track/*) echo $url | play; break ;;
-	esac
-	echo "$0 $url" >&2
-	while path=$($FUNC $url); do # browse REPL
-		case "$path" in
-		▸) echo "$API$url"; $FETCH "$API$url" | jq "$FMT_TRKS" | play cat; break ;;
-		⇄) echo "$API$url"; $FETCH "$API$url" | jq "$FMT_TRKS" | play shuf; break ;;
-		/*) $0 "$path";;
-		*)  $0 "$url/$path";;
-		esac
-	done
-done
-[ $# -eq 0 ] && $0 '' # give an argument to iterate over (if none given)
+
+url="${1:-$QUERY_STRING}"
+FUNC=$(echo "get_$url" | sed "$FMT_FUNC")
+type $FUNC 1>/dev/null 2>/dev/null || FUNC=get_default
+if [ "$REQUEST_METHOD" = "GET" ] ; then
+	PLAYER=cat; # env >&2
+	case $HTTP_ACCEPT in *text/html*) DLG_LIST=href; ;; *) DLG_LIST=m3u ;; esac
+	http() { echo "Content-Type: ${1:-text/html; charset=utf-8}" ; echo ; }
+	href() { http ; echo '<ul>' ; while [ "$#" -gt 1 ]; do echo "<li><a href=?$1>$2</a></li>" ; shift 2; done; echo '</ul>' ;}
+	m3u()  { http application/vnd.apple.mpegurl ; echo '#EXTM3U' ; while [ "$#" -gt 1 ]; do echo "#EXTINF:0, $2"; echo "http://$REMOTE_ADDR:$SERVER_PORT$SCRIPT_NAME?$1" ; shift 2; done; }
+	case $url in *=|*/0) http; echo '<form onsubmit="location.search+=q.value;return false"><input name=q></form>'; exit ;; esac
+	$FUNC $url
+else
+	case $url in *=|*/0) url="$url$($DLG_TEXT ''|jq -rR '.|@uri')" ;; esac
+	$0 $($FUNC $url)
+fi
