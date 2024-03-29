@@ -72,4 +72,4 @@ open http://127.0.0.1:8000/cgi-bin/dzr?6113114
 - Make sure Flakes are enabled, see the [Nix Flakes documentation](https://nixos.wiki/wiki/Flakes)
 - Run it!
     - Default branch: `nix run github.com/yne/dzr`
-    - Specific branch: `nix run github.com/yne/dzr/branch-name` 
+    - Specific revision: `nix run github.com/yne/dzr/<commit-hash>` 
