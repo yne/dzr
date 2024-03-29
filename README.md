@@ -31,6 +31,8 @@
 | Ubuntu + [snap](https://snapcraft.io/dzr) | `snap install --edge dzr` | [Help Me](https://github.com/yne/dzr/issues/25)
 | Android + [Termux](https://f-droid.org/packages/com.termux/) | `curl -sL github.com/yne/dzr/archive/master.tar.gz \| tar xzf -` <br> `sudo mv dzr-master/dzr* /usr/local/bin` | [![](https://img.shields.io/badge/-tar.gz-40c010?logo=hackthebox)](https://github.com/yne/dzr/archive/master.tar.gz)
 | VSCode | `code --install-extension ./path/tos/dzr-x.y.z.vsix` | [![](https://img.shields.io/badge/VSIX-4c1?logo=visualstudiocode)](https://github.com/yne/dzr/releases)
+| Nix | `nix run github.com/yne/dzr` | latest |
+
 ## Usage
 
 ```sh
@@ -63,3 +65,11 @@ mkdir -p ./cgi-bin/ && install dzr* ./cgi-bin/
 python3 -m http.server --cgi
 open http://127.0.0.1:8000/cgi-bin/dzr?6113114
 ```
+
+## Running with Nix
+
+- Make sure you have Nix installed first, see the [Nix documentation](https://nixos.org/download/)
+- Make sure Flakes are enabled, see the [Nix Flakes documentation](https://nixos.wiki/wiki/Flakes)
+- Run it!
+    - Default branch: `nix run github.com/yne/dzr`
+    - Specific branch: `nix run github.com/yne/dzr/branch-name` 
