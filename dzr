@@ -30,13 +30,19 @@ DLG_TEXT="dialog --keep-tite --output-fd 1 --inputbox $1: 0 0"
 FMT_LIST='(if .data then .data else .tracks.data end)[]|("/"+.type+"/"+(.id|tostring), (.title+.name+" "+.artist.name|gsub("\\x22";"")))'
 FMT_TRKS='"/track/"+([(if .data then .data else .tracks.data end)[]|select(.type=="track")|.id]|@csv)'
 FMT_FUNC='s@[,?].*@@;s@[^a-zA-Z0-9]\{1,\}@_@g;s@[0-9,]\{1,\}@0@g;s@_\{1,\}$@@'
+
+http() { echo "Content-Type: ${1:-text/html; charset=utf-8}" ; echo ; }
+href() { http ; echo '<ul>' ; while [ "$#" -gt 1 ]; do echo "<li><a href=\"webdav://$REMOTE_ADDR:$SERVER_PORT$SCRIPT_NAME?$1\">▶</a> <a href=?$1>$2</a></li>" ; shift 2; done; echo '</ul>' ;}
+m3u()  { http application/vnd.apple.mpegurl ; echo '#EXTM3U' ; while [ "$#" -gt 1 ]; do echo "#EXTINF:0, $2"; echo "http://$REMOTE_ADDR:$SERVER_PORT$SCRIPT_NAME?$1" ; shift 2; done; }
+
 get()          { $DLG_LIST /search/track?q= Track /search/artist?q= Artist /search/album?q= Album /search/playlist?q= Playlist /search/user?q= User /user/0 UserID /search/radio?q= Radio /radio Radios /genre Genre;}
 get_genre_0()  { $DLG_LIST $url/radios Radios $url/artists Artists ;}
 get_radio_0()  { $DLG_LIST $url/tracks Tracks $url/fans Fans ;}
 get_album_0()  { $DLG_LIST $url/tracks Tracks $url/fans Fans ;}
 get_user_0()   { $DLG_LIST $url/charts Charts $url/albums Albums $url/playlists Playlists $url/flow Flow $url/tracks Tracks $url/artists Artists ;}
 get_artist_0() { $DLG_LIST $url/top?limit=50 Top50 $url/albums Albums $url/fans Fans $url/related Related $url/radio Radio $url/playlists Playlists ;}
-get_default()  { eval $DLG_LIST $($FETCH -H "Accept-Language: $LANG" "$API$1" | jq "$FMT_LIST") ;} # TODO: .next "'▸' 'play all /track/' '⇄' 'shuf all /track/'" 
+get_default()  { eval $DLG_LIST $($FETCH -H "Accept-Language: $LANG" "$API$1" | jq "$FMT_LIST") ;} # xargs can't call fonction (href) + need eval for arguments
+#TODO: .next "'▸' 'play all /track/' '⇄' 'shuf all /track/'"
 get_track_0()  { # support multi-ids /track/1,2,3 for token reuse
 	[ "$REQUEST_METHOD" = "GET" ] && http audio/mpeg
 	$0-url $@ | ${SHUF:-cat} | while read url id; do
@@ -50,12 +56,9 @@ type $FUNC 1>/dev/null 2>/dev/null || FUNC=get_default
 if [ "$REQUEST_METHOD" = "GET" ] ; then
 	PLAYER=cat; # env >&2
 	case $HTTP_ACCEPT in *text/html*) DLG_LIST=href; ;; *) DLG_LIST=m3u ;; esac
-	http() { echo "Content-Type: ${1:-text/html; charset=utf-8}" ; echo ; }
-	href() { http ; echo '<ul>' ; while [ "$#" -gt 1 ]; do echo "<li><a href=?$1>$2</a></li>" ; shift 2; done; echo '</ul>' ;}
-	m3u()  { http application/vnd.apple.mpegurl ; echo '#EXTM3U' ; while [ "$#" -gt 1 ]; do echo "#EXTINF:0, $2"; echo "http://$REMOTE_ADDR:$SERVER_PORT$SCRIPT_NAME?$1" ; shift 2; done; }
-	case $url in *=|*/0) http; echo '<form onsubmit="location.search+=q.value;return false"><input name=q></form>'; exit ;; esac
-	$FUNC $url
+	case $url in *=|*/0) http; echo '<form onsubmit="location.search+=q.value;return false"><input name=q></form>';;
+	*) $FUNC $url;; esac
 else
 	case $url in *=|*/0) url="$url$($DLG_TEXT ''|jq -rR '.|@uri')" ;; esac
-	$0 $($FUNC $url)
+	while next=$($FUNC $url); do $0 $next ; done # loop while user don't cancel
 fi
