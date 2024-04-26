@@ -2,6 +2,10 @@
 
 BINARY_NAME="$(basename "$0")"
 
+if ! command -v "$BINARY_NAME" &>/dev/null; then
+	BINARY_NAME=$0
+fi
+
 # CGI call handling, for example moving ./dzr* bin to ~/cgi-bin and running :
 #     python3 -m http.server --cgi
 # from your ~ (as non-root !) will reply to http://0.0.0.0:8000/cgi-bin/dzr?6113114,806027
