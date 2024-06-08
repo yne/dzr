@@ -1,4 +1,4 @@
-/**@type import('vscode') */
+/**@type import('vscode') */ // soon: https://devblogs.microsoft.com/typescript/announcing-typescript-5-5-rc/#type-imports-in-jsdoc
 const vscode = require("vscode");
 const crypto = require('crypto');
 const https = require('https');
@@ -21,19 +21,21 @@ const fetch = (url, opt, data) => new Promise((resolve, reject) => {
 // - /track/:id gives contributors but /search/track?q= don't
 // - inconsistent listing structure (/playlist/:id => tracks.data, sometimes=>data, sometimes data.tracks)
 // browse can be called from: user query / self list(from static menu) / self list(from fetch result)
-async function browse(url_or_event, label) {
-	console.log(url_or_event);
+async function browse(url_or_event_or_ids, label) {
+	console.log(url_or_event_or_ids);
 	try {
-		const url = typeof (url_or_event) == "string" ? url_or_event : '/';
+		if (Array.isArray(url_or_event_or_ids)) return url_or_event_or_ids.map(id => ({ id }));
+		const ignoreFocusOut = true;
+		const url = typeof (url_or_event_or_ids) == "string" ? url_or_event_or_ids : '/';
 		const id = url.replace(/\d+/g, '0').replace(/[^\w]/g, '_');
 		const menus = conf.get('menus');
 		const title = (label || '').replace(/\$\(.+?\)/g, '');
 		if (url.endsWith('=') || url.endsWith('/0')) { // query step
-			const input = await vscode.window.showInputBox({ title });
+			const input = await vscode.window.showInputBox({ title, ignoreFocusOut });
 			if (!input) return;
 			return await browse(url.replace(/0$/, '') + input, `${label}: ${input}`);
 		} else if (menus[id]) { // menu step
-			const pick = menus[id].length > 1 ? await vscode.window.showQuickPick(menus[id], { title: title || url }) : menus[id][0];
+			const pick = menus[id].length > 1 ? await vscode.window.showQuickPick(menus[id], { title: title || url, ignoreFocusOut }) : menus[id][0];
 			if (!pick) return;
 			return await browse(url + pick.path, pick.label);
 		} else { // fetch step
@@ -49,7 +51,7 @@ async function browse(url_or_event, label) {
 				description: [entry.artist?.name, entry.title_version, entry.nb_tracks].join(' '),
 				path: `/${entry.type}/${entry.id}`,
 			}));
-			const picks = await vscode.window.showQuickPick(choices, { title: title || url, canPickMany });
+			const picks = await vscode.window.showQuickPick(choices, { title: title || url, canPickMany, ignoreFocusOut });
 			if (!picks) return;
 			return canPickMany ? picks : await browse(picks.path, picks.label);
 		}
@@ -70,14 +72,17 @@ const with_url = async (songs) => songs?.length ? await vscode.window.withProgre
 			license_token: USR_NFO.USER.OPTIONS.license_token,
 			media: [{ type: "FULL", formats: [{ cipher: "BF_CBC_STRIPE", format: "MP3_128" }] }]
 		}))));
+		console.log(SNG_NFO)
 		const errors = URL_NFO.data.map((nfo, i) => [nfo.errors, songs[i]]).filter(([err]) => err).map(([[err], sng]) => `${sng.title}: ${err.message} (${err.code})`).join('\n');
 		if (errors) setTimeout(() => vscode.window.showWarningMessage(errors), 500); // can't warn while progress ?
 		return songs.map(({/* api :*/ id, md5_image, duration, title_short, title_version, artist, contributors,
 		                   /*cache:*/ title, version, artists }, i) => ({
-			id, md5_image, duration,
-			title: title_short?.replace(/ ?\(feat.*?\)/, '') || title,
+			id,
+			md5_image: md5_image || SNG_NFO.data[i].ALB_PICTURE,
+			duration: duration || +SNG_NFO.data[i].DURATION,
+			title: title || SNG_NFO.data[i].SNG_TITLE.replace(/ ?\(feat.*?\)/, ''),
 			version: title_version || version,
-			artists: artists ?? (contributors || [artist])?.map(({ id, name }) => ({ id, name })),
+			artists: artists || SNG_NFO.data[i].ARTISTS.map(a => ({ id: a.ART_ID, name: a.ART_NAME, md5: a.ART_PICTURE })),
 			size: +SNG_NFO.data[i].FILESIZE,
 			expire: SNG_NFO.data[i].TRACK_TOKEN_EXPIRE,
 			url: URL_NFO.data[i].media?.[0]?.sources?.[0]?.url
@@ -115,6 +120,7 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 		this.initAckSemaphore();
 		this.state.queue = conf.get('queue'); // first is best
 		this.state.looping = conf.get('looping');
+		console.log(vscode.ThemeIcon.File)
 	}
 	renderStatus() {
 		const index = this.state.queue?.indexOf(this.state.current);
@@ -159,13 +165,13 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 	dragMimeTypes = ['text/uri-list'];
 	_onDidChangeTreeData = new vscode.EventEmitter();
 	onDidChangeTreeData = this._onDidChangeTreeData.event;
+	/**@type {import('vscode').TreeView}*/
 	treeView = vscode.window.createTreeView('dzr.queue', { treeDataProvider: this, dragAndDropController: this, canSelectMany: true });
-
 	/**@returns {vscode.TreeItem} */
 	getTreeItem = (item) => ({
-		iconPath: vscode.ThemeIcon.File,
+		iconPath: new vscode.ThemeIcon("music"),
 		label: item.title + ' - ' + item.artists.map(a => a.name).join(),
-		description: hhmmss(item.duration) + " " + (item.version||''),
+		description: hhmmss(item.duration || 0) + " " + (item.version || ''),
 		contextValue: 'dzr.track',
 		command: { title: 'Play', command: 'dzr.load', tooltip: 'Play', arguments: [this.state.queue.indexOf(item)] },
 		//tooltip: JSON.stringify(item, null, 2),
@@ -182,7 +188,7 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 		this.state.queue = [...striped.slice(0, index), ...sources, ...striped.slice(index)];
 	}
 }
-exports.activate = async function (/**@type {vscode.ExtensionContext}*/ context) {
+exports.activate = async function (/**@type {import('vscode').ExtensionContext}*/ context) {
 	// deezer didn't DMCA'd dzr so let's follow the same path here
 	conf.get('cbc') || vscode.window.withProgress({ title: 'Extracting CBC key...', location }, async () => {
 		const html_url = 'https://www.deezer.com/en/channels/explore';
@@ -199,7 +205,10 @@ exports.activate = async function (/**@type {vscode.ExtensionContext}*/ context)
 	const dzr = new DzrWebView();
 	const htmlUri = vscode.Uri.joinPath(context.extensionUri, 'webview.html');
 	const iconUri = vscode.Uri.joinPath(context.extensionUri, 'logo.svg'); //same for light+dark
+
 	context.subscriptions.push(...dzr.statuses, dzr.treeView,
+		// catch vscode://yne.dzr/* urls
+		vscode.window.registerUriHandler({ handleUri(uri) { (({ path, query }) => vscode.commands.executeCommand(`dzr.${path.slice(1)}`, ...(query ? JSON.parse(query) : [])))(vscode.Uri.parse(uri)); } }),
 		vscode.commands.registerCommand('dzr.show', () => dzr.show(htmlUri, iconUri)),
 		vscode.commands.registerCommand("dzr.play", () => dzr.post('play')),
 		vscode.commands.registerCommand("dzr.pause", () => dzr.post('pause')),
@@ -207,10 +216,14 @@ exports.activate = async function (/**@type {vscode.ExtensionContext}*/ context)
 		vscode.commands.registerCommand("dzr.loopQueue", () => dzr.state.looping = "queue"),
 		vscode.commands.registerCommand("dzr.loopTrack", () => dzr.state.looping = "track"),
 		vscode.commands.registerCommand("dzr.loopOff", () => dzr.state.looping = "off"),
-		vscode.commands.registerCommand("dzr.add", async (path, label) => dzr.state.queue = [...dzr.state.queue, ...await with_url(await browse(path, label)) || []]),
+		vscode.commands.registerCommand("dzr.add", async (path, label) => with_url(await browse(path, label)).then(tracks => dzr.state.queue = [...dzr.state.queue, ...tracks])),
 		vscode.commands.registerCommand("dzr.remove", async (item, items) => (items || [item]).map(i => vscode.commands.executeCommand('dzr.removeAt', dzr.state.queue.indexOf(i)))),
 		vscode.commands.registerCommand("dzr.removeAt", async (index) => index >= 0 && (dzr.state.queue = [...dzr.state.queue.slice(0, index), ...dzr.state.queue.slice(index + 1)])),
 		vscode.commands.registerCommand("dzr.clear", async () => dzr.state.queue = []),
+		vscode.commands.registerCommand("dzr.share", async (track, tracks) => {
+			const ids = JSON.stringify(track ? [(tracks || [track]).map(e => e.id || track.id)] : [dzr.state.queue.map(q => q.id)]);
+			vscode.env.clipboard.writeText(new vscode.Uri("vscode", context.extension.id, '/add', ids).toString())
+		}),
 		vscode.commands.registerCommand("dzr.shuffle", async () => {
 			const shuffle = [...dzr.state.queue];
 			for (let i = shuffle.length - 1; i > 0; i--) {
@@ -230,7 +243,7 @@ exports.activate = async function (/**@type {vscode.ExtensionContext}*/ context)
 				while (!dzr.state.ready) await wait();
 			}
 			dzr.state.current = dzr.state.queue[pos];
-			if (dzr.state.current.expire < (new Date() / 1000)) {
+			if ((dzr.state.current.expire || 0) < (new Date() / 1000)) {
 				dzr.state.queue = await with_url(dzr.state.queue);//TODO: hope item is now up to date
 			}
 			const hex = (str) => str.split('').map(c => c.charCodeAt(0))

@@ -25,6 +25,7 @@ const cmd = (name, ...args) => `command:${name}?` + encodeURIComponent(JSON.stri
 dialog.onclose=()=>{audio.play();post('user_interact');}
 ['ended', 'pause', 'playing'].map(on => audio.addEventListener(on, () => post('player_' + on)));
 let mediaSource, sourceBuffer;
+const image = (type,md5,size=80) => `https://e-cdns-images.dzcdn.net/images/${type}/${md5}/${size}x${size}.jpg`
 const on = {// event from VSCode
     async open(item) {
         mediaSource = new window.MediaSource();
@@ -40,8 +41,8 @@ const on = {// event from VSCode
     state(state, updates=[]) {
         if (updates.includes('current')) {
             title.innerText = state.current.title;
-            artists.replaceChildren(...state.current.artists.map(artist=>el('a',{href:cmd("dzr.add", `/artist/${artist.id}`, artist.name)},[new Text(artist.name)])));
-            img.src = `https://e-cdns-images.dzcdn.net/images/cover/${state.current.md5_image}/1000x1000-000000-80-0-0.jpg`;
+            artists.replaceChildren(...state.current.artists.map(artist=>el('a',{href:cmd("dzr.add", `/artist/${artist.id}`, artist.name),style:`background-image:url(${image('artist',artist.md5)})`},[new Text(artist.name)])));
+            img.src = image("cover", state.current.md5_image, 1000);
             navigator.mediaSession.metadata = new MediaMetadata({
                 title: state.current.title,
                 artist: state.current.artists.map(a=>a.name).join(),
@@ -64,4 +65,5 @@ navigator.mediaSession.setActionHandler("nexttrack", ()=>post('user_next'))
     a:not(:hover){text-decoration: none;}
     img:not([src]){opacity: 0;}
     dialog::backdrop {background-color: rgba(0, 0, 0, .9);}
+    #artists>a {padding-left: 1.5em;background-repeat: no-repeat;background-size: contain;}
 </style>

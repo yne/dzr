@@ -98,39 +98,43 @@
 			},
 			{
 				"category": "dzr",
-				"command": "dzr.removeAt",
-				"title": "Queue Remove Track",
-				"when": "false",
-				"icon": "$(close)"
-			},
-			{
-				"category": "dzr",
 				"command": "dzr.clear",
 				"title": "Queue Remove All",
-				"icon": "$(close)"
+				"icon": "$(clear-all)"
 			},
 			{
 				"category": "dzr",
 				"command": "dzr.shuffle",
 				"title": "Queue Shuffle",
 				"icon": "$(arrow-swap)"
+			},
+			{
+				"category": "dzr",
+				"command": "dzr.share",
+				"title": "Copy vscode:// Link",
+				"icon": "$(link)"
 			}
 		],
 		"menus": {
 			"view/title": [
 				{
 					"when": "view == dzr.queue",
-					"group": "navigation@0",
+					"group": "navigation@9",
 					"command": "dzr.add"
 				},
 				{
 					"when": "view == dzr.queue && dzr.queue!=''",
-					"group": "navigation@1",
+					"group": "navigation@8",
 					"command": "dzr.clear"
 				},
 				{
 					"when": "view == dzr.queue && dzr.queue!=''",
-					"group": "navigation@1",
+					"group": "navigation@7",
+					"command": "dzr.share"
+				},
+				{
+					"when": "view == dzr.queue && dzr.queue!=''",
+					"group": "navigation@6",
 					"command": "dzr.shuffle"
 				},
 				{
@@ -157,13 +161,18 @@
 				},
 				{
 					"group": "navigation",
+					"command": "dzr.remove",
+					"when": "viewItem == dzr.track && listMultiSelection"
+				},
+				{
+					"group": "navigation",
 					"command": "dzr.href",
 					"when": "viewItem == dzr.track && !listMultiSelection"
 				},
 				{
 					"group": "navigation",
-					"command": "dzr.remove",
-					"when": "viewItem == dzr.track && listMultiSelection"
+					"command": "dzr.share",
+					"when": "viewItem == dzr.track"
 				}
 			]
 		},
