@@ -22,7 +22,6 @@ const fetch = (url, opt, data) => new Promise((resolve, reject) => {
 // - inconsistent listing structure (/playlist/:id => tracks.data, sometimes=>data, sometimes data.tracks)
 // browse can be called from: user query / self list(from static menu) / self list(from fetch result)
 async function browse(url_or_event_or_ids, label) {
-	console.log(url_or_event_or_ids);
 	try {
 		if (Array.isArray(url_or_event_or_ids)) return url_or_event_or_ids.map(id => ({ id }));
 		const ignoreFocusOut = true;
@@ -57,7 +56,6 @@ async function browse(url_or_event_or_ids, label) {
 		}
 	} catch (e) { console.error(e) }
 }
-/* songs may came from API (full info) or storage (light info) */
 const with_url = async (songs) => songs?.length ? await vscode.window.withProgress({ title: 'Fetching Song Info...', location }, async (progress) => {
 	try { // take 7s (with, or without agent)
 		const next = (val) => (progress.report({ increment: 100 / 4 }), val);
@@ -72,17 +70,14 @@ const with_url = async (songs) => songs?.length ? await vscode.window.withProgre
 			license_token: USR_NFO.USER.OPTIONS.license_token,
 			media: [{ type: "FULL", formats: [{ cipher: "BF_CBC_STRIPE", format: "MP3_128" }] }]
 		}))));
-		console.log(SNG_NFO)
 		const errors = URL_NFO.data.map((nfo, i) => [nfo.errors, songs[i]]).filter(([err]) => err).map(([[err], sng]) => `${sng.title}: ${err.message} (${err.code})`).join('\n');
 		if (errors) setTimeout(() => vscode.window.showWarningMessage(errors), 500); // can't warn while progress ?
-		return songs.map(({/* api :*/ id, md5_image, duration, title_short, title_version, artist, contributors,
-		                   /*cache:*/ title, version, artists }, i) => ({
+		return songs.map(({ id }, i) => ({
 			id,
-			md5_image: md5_image || SNG_NFO.data[i].ALB_PICTURE,
-			duration: duration || +SNG_NFO.data[i].DURATION,
-			title: title || SNG_NFO.data[i].SNG_TITLE.replace(/ ?\(feat.*?\)/, ''),
-			version: title_version || version,
-			artists: artists || SNG_NFO.data[i].ARTISTS.map(a => ({ id: a.ART_ID, name: a.ART_NAME, md5: a.ART_PICTURE })),
+			md5_image: SNG_NFO.data[i].ALB_PICTURE,
+			duration: +SNG_NFO.data[i].DURATION,
+			title: SNG_NFO.data[i].SNG_TITLE.replace(/ ?\(feat.*?\)/, ''),
+			artists: SNG_NFO.data[i].ARTISTS.map(a => ({ id: a.ART_ID, name: a.ART_NAME, md5: a.ART_PICTURE })),
 			size: +SNG_NFO.data[i].FILESIZE,
 			expire: SNG_NFO.data[i].TRACK_TOKEN_EXPIRE,
 			url: URL_NFO.data[i].media?.[0]?.sources?.[0]?.url
@@ -120,7 +115,6 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 		this.initAckSemaphore();
 		this.state.queue = conf.get('queue'); // first is best
 		this.state.looping = conf.get('looping');
-		console.log(vscode.ThemeIcon.File)
 	}
 	renderStatus() {
 		const index = this.state.queue?.indexOf(this.state.current);
@@ -174,13 +168,12 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 		description: hhmmss(item.duration || 0) + " " + (item.version || ''),
 		contextValue: 'dzr.track',
 		command: { title: 'Play', command: 'dzr.load', tooltip: 'Play', arguments: [this.state.queue.indexOf(item)] },
-		//tooltip: JSON.stringify(item, null, 2),
 	})
 	getChildren = () => this.state.queue
-	async handleDrag(sources, treeDataTransfer, token) {
+	async handleDrag(sources, treeDataTransfer) {
 		treeDataTransfer.set(this.dropMimeTypes[0], new vscode.DataTransferItem(sources));
 	}
-	async handleDrop(onto, transfer, token) {
+	async handleDrop(onto, transfer) {
 		const sources = transfer.get(this.dropMimeTypes[0])?.value;
 		if (!sources || sources.includes(onto)) return; //don't move selection onto one of it members
 		const striped = this.state.queue.filter(item => !sources.includes(item));
@@ -220,6 +213,7 @@ exports.activate = async function (/**@type {import('vscode').ExtensionContext}*
 		vscode.commands.registerCommand("dzr.remove", async (item, items) => (items || [item]).map(i => vscode.commands.executeCommand('dzr.removeAt', dzr.state.queue.indexOf(i)))),
 		vscode.commands.registerCommand("dzr.removeAt", async (index) => index >= 0 && (dzr.state.queue = [...dzr.state.queue.slice(0, index), ...dzr.state.queue.slice(index + 1)])),
 		vscode.commands.registerCommand("dzr.clear", async () => dzr.state.queue = []),
+		vscode.commands.registerCommand("dzr.shareAll", async () => vscode.commands.executeCommand("dzr.share")),
 		vscode.commands.registerCommand("dzr.share", async (track, tracks) => {
 			const ids = JSON.stringify(track ? [(tracks || [track]).map(e => e.id || track.id)] : [dzr.state.queue.map(q => q.id)]);
 			vscode.env.clipboard.writeText(new vscode.Uri("vscode", context.extension.id, '/add', ids).toString())

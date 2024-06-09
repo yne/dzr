@@ -111,7 +111,13 @@
 			{
 				"category": "dzr",
 				"command": "dzr.share",
-				"title": "Copy vscode:// Link",
+				"title": "Copy vscode:// Link(s)",
+				"icon": "$(link)"
+			},
+			{
+				"category": "dzr",
+				"command": "dzr.shareAll",
+				"title": "Copy all vscode:// Links",
 				"icon": "$(link)"
 			}
 		],
@@ -130,7 +136,7 @@
 				{
 					"when": "view == dzr.queue && dzr.queue!=''",
 					"group": "navigation@7",
-					"command": "dzr.share"
+					"command": "dzr.shareAll"
 				},
 				{
 					"when": "view == dzr.queue && dzr.queue!=''",
