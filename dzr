@@ -1,5 +1,11 @@
 #!/bin/sh
 
+BINARY_NAME="$(basename "$0")"
+
+if ! command -v "$BINARY_NAME" &>/dev/null; then
+	BINARY_NAME=$0
+fi
+
 # CGI call handling, for example moving ./dzr* bin to ~/cgi-bin and running :
 #     python3 -m http.server --cgi
 # from your ~ (as non-root !) will reply to http://0.0.0.0:8000/cgi-bin/dzr?6113114,806027
@@ -9,29 +15,30 @@ if [ "$REQUEST_METHOD" = "HEAD" ] ; then
 	printf 'Access-Control-Allow-Origin: *\ndzr-api: 0\n\n'
 elif [ "$REQUEST_METHOD" = "GET" ] ; then
 	printf "Cache-Control: max-age=31536000, immutable\nContent-Type: audio/mpeg\n\n"
-	echo "$QUERY_STRING" | xargs basename | xargs $0-url | while read url id; do
-		$FETCH "$url" | $0-dec $id
+	echo "$QUERY_STRING" | xargs basename | xargs "$BINARY_NAME-url" | while read url id; do
+		$FETCH "$url" | "$BINARY_NAME-dec" "$id"
 	done
 fi
-[ ! -z "$REQUEST_METHOD" ] && exit
+[ -n "$REQUEST_METHOD" ] && exit
 
 # extraction + warning by charleywright, see: https://github.com/yne/dzr/issues/11
-unscramble(){ printf "${8}${16}${7}${15}${6}${14}${5}${13}${4}${12}${3}${11}${2}${10}${1}${9}";}
+unscramble(){ printf "%s" "${8}${16}${7}${15}${6}${14}${5}${13}${4}${12}${3}${11}${2}${10}${1}${9}";}
 if [ -z "$DZR_CBC" ]; then
-	command -v $(echo "$FETCH" | cut -f 1 -d " ") >/dev/null || { echo "key extraction require $FETCH" 1>&2 ; exit 1 ;}
+	command -v "$(echo "$FETCH" | cut -f 1 -d " ")" >/dev/null || { echo "key extraction require $FETCH" 1>&2 ; exit 1 ;}
 	printf "Add the following to your shell profile e.g. ~/.profile or ~/.zshrc:\n" >&2
 	APP_WEB=$($FETCH -L deezer.com/en/channels/explore | sed -n 's/.*src="\([^"]*app-web[^"]*\).*/\1/p' | xargs $FETCH -L)
 	TMP_CBC=$(echo "$APP_WEB"  | tr ,_ '\n'  | sed -n 's/.*\(%5B0x..%2C.\{39\}%2C0x..%5D\).*/\1/p' | sed 's/%../\n/g' | xargs printf '\\%o ')
-	export DZR_CBC=$(unscramble $TMP_CBC);
-	printf "    export DZR_CBC=$DZR_CBC" >&2
-	[ "-$@" = "-!" ] && printf '%s' "$DZR_CBC" && exit
+	DZR_CBC=$(unscramble $TMP_CBC);
+	export DZR_CBC
+	printf "    export DZR_CBC=%s" "$DZR_CBC" >&2
+	[ "-$*" = "-!" ] && printf '%s' "$DZR_CBC" && exit
 	sleep 2 # give time to read the warning
 	echo
 fi
 
 # dependencies check, see: https://github.com/yne/dzr/issues/12
-for c in jq curl dialog openssl $(echo "$PLAYER" | cut -f 1 -d " "); do
-	command -v $c >/dev/null || { echo "$c is required" 1>&2 ; UNMET_DEPENDENCIES=1;}
+for c in jq curl dialog openssl "$(echo "$PLAYER" | cut -f 1 -d " ")"; do
+	command -v "$c" >/dev/null || { echo "$c is required" 1>&2 ; UNMET_DEPENDENCIES=1;}
 done
 [ -n "$UNMET_DEPENDENCIES" ] && exit 1;
 
@@ -51,8 +58,8 @@ dzr_user_0()   { $DLG_LIST charts '' albums '' playlists '' flow '' tracks '' ar
 dzr_artist_0() { $DLG_LIST top?limit=50 '' albums '' fans '' related '' radio '' playlists '' ;}
 dzr_default()  { $FETCH -H "Accept-Language: $LANG" "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST ▸ "play all /track/" ⇄ "shuf all /track/" ;} # TODO: .next
 play() { # receive /track/1,2,3 from stdin
-	xargs basename | xargs $0-url | ${1:-cat} | while read url id; do
-		$FETCH "$url" | $0-dec $id | eval ${PLAYER:-'mpv -'} || break # stop if Ctrl+C : $? = 4
+	xargs basename | xargs $BINARY_NAME-url | ${1:-cat} | while read url id; do
+		$FETCH "$url" | $BINARY_NAME-dec $id | eval ${PLAYER:-'mpv -'} || break # stop if Ctrl+C : $? = 4
 	done
 }
 for url in "$@"; do
