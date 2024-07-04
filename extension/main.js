@@ -2,13 +2,13 @@
 const vscode = require("vscode");
 const crypto = require('crypto');
 const https = require('https');
-const conf = vscode.workspace.getConfiguration("dzr");
+const conf = () => vscode.workspace.getConfiguration("dzr");
 const location = vscode.ProgressLocation.Notification;
 const hhmmss = (s) => (new Date(s * 1000)).toISOString().slice(11, 19).replace(/^00:/, '');
 const wait = (ms = 1000) => new Promise(resolve => setTimeout(resolve, ms));
 // still no fetch() in 2023 ?
 const fetch = (url, opt, data) => new Promise((resolve, reject) => {
-	const chunks = [], req = https.request(url, opt, res => {
+	const chunks = [], req = https.request(url, { rejectUnauthorized: conf().get('secure'), ...opt }, res => {
 		res.on('data', chunk => chunks.push(chunk));
 		res.on('end', () => resolve(Buffer.concat(chunks)));
 	}).on('error', reject);
@@ -27,7 +27,7 @@ async function browse(url_or_event_or_ids, label) {
 		const ignoreFocusOut = true;
 		const url = typeof (url_or_event_or_ids) == "string" ? url_or_event_or_ids : '/';
 		const id = url.replace(/\d+/g, '0').replace(/[^\w]/g, '_');
-		const menus = conf.get('menus');
+		const menus = conf().get('menus');
 		const title = (label || '').replace(/\$\(.+?\)/g, '');
 		if (url.endsWith('=') || url.endsWith('/0')) { // query step
 			const input = await vscode.window.showInputBox({ title, ignoreFocusOut });
@@ -39,11 +39,11 @@ async function browse(url_or_event_or_ids, label) {
 			return await browse(url + pick.path, pick.label);
 		} else { // fetch step
 			const json = JSON.parse(await fetch("https://api.deezer.com" + url)); // todo: json.next?
-			console.debug(json);
+			//console.debug(json);
 			const data = json.data?.tracks || json.data || json.tracks?.data;
 			const picked = url.match(/\/(playlist|album)\//);
 			const canPickMany = data.find(item => item.type == "track");
-			const type2icon = conf.get('type2icon');
+			const type2icon = conf().get('type2icon');
 			const choices = data.map(entry => ({
 				...entry, picked,
 				label: (type2icon[entry.type] || '') + (entry.title_short || entry.name || entry.title),
@@ -101,7 +101,7 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 		set: (target, key, value) => {
 			target[key] = value;
 			if (['queue', 'looping'].includes(key)) { // persist those values across reboot
-				conf.update(key, value, vscode.ConfigurationTarget.Global);
+				conf().update(key, value, vscode.ConfigurationTarget.Global);
 			}
 			if (key == 'queue') this._onDidChangeTreeData.fire();
 			vscode.commands.executeCommand('setContext', `dzr.${key}`, value);
@@ -113,8 +113,8 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 
 	constructor() {
 		this.initAckSemaphore();
-		this.state.queue = conf.get('queue'); // first is best
-		this.state.looping = conf.get('looping');
+		this.state.queue = conf().get('queue'); // first is best
+		this.state.looping = conf().get('looping');
 	}
 	renderStatus() {
 		const index = this.state.queue?.indexOf(this.state.current);
@@ -183,7 +183,7 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 }
 exports.activate = async function (/**@type {import('vscode').ExtensionContext}*/ context) {
 	// deezer didn't DMCA'd dzr so let's follow the same path here
-	conf.get('cbc') || vscode.window.withProgress({ title: 'Extracting CBC key...', location }, async () => {
+	conf().get('cbc') || vscode.window.withProgress({ title: 'Extracting CBC key...', location }, async () => {
 		const html_url = 'https://www.deezer.com/en/channels/explore';
 		const html = (await fetch(html_url)).toString('utf-8');
 		const js_url = html.match(/src="(http[^"]+app-web\.[^"]+\.js)"/)?.[1];
@@ -193,7 +193,7 @@ exports.activate = async function (/**@type {import('vscode').ExtensionContext}*
 		const cbc = a.map((a, i) => `${a}${b[i]}`).join('');// zip a+b
 		const sha = crypto.createHash('sha1').update(cbc).digest('hex').slice(0, 8);
 		if (sha != '3ad58d92') return await vscode.window.showErrorMessage('Bad extracted key');
-		conf.update('cbc', cbc, vscode.ConfigurationTarget.Global);
+		conf().update('cbc', cbc, vscode.ConfigurationTarget.Global);
 	});
 	const dzr = new DzrWebView();
 	const htmlUri = vscode.Uri.joinPath(context.extensionUri, 'webview.html');
@@ -242,7 +242,7 @@ exports.activate = async function (/**@type {import('vscode').ExtensionContext}*
 			}
 			const hex = (str) => str.split('').map(c => c.charCodeAt(0))
 			const md5 = hex(crypto.createHash('md5').update(`${dzr.state.current.id}`).digest('hex'));
-			const key = Buffer.from(hex(conf.get('cbc')).map((c, i) => c ^ md5[i] ^ md5[i + 16]));
+			const key = Buffer.from(hex(conf().get('cbc')).map((c, i) => c ^ md5[i] ^ md5[i + 16]));
 			const iv = Buffer.from([0, 1, 2, 3, 4, 5, 6, 7]);
 			const stripe = 2048;//TODO:use .pipe() API https://codereview.stackexchange.com/questions/57492/
 			dzr.post('open', dzr.state.current);

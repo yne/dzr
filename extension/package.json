@@ -2,7 +2,7 @@
 	"name": "dzr",
 	"displayName": "DZR player",
 	"description": "deezer.com player",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"publisher": "yne",
 	"engines": {
 		"vscode": "^1.73.0"
@@ -190,6 +190,11 @@
 					"type": "string",
 					"default": "",
 					"description": "track decryption key"
+				},
+				"dzr.secure": {
+					"type": "boolean",
+					"default": true,
+					"description": "Disable if you are behind a corporate proxy"
 				},
 				"dzr.queue": {
 					"type": "array",
