@@ -1,0 +1,10 @@
+{
+    "manifest_version": 3,
+    "name": "Deezer accountless player",
+    "description": "Deezer accountless player based on dzr by yne",
+    "version": "1.0",
+    "action": {
+        "default_popup": "dzr.html",
+        "default_icon": "logo.png"
+    }
+}
