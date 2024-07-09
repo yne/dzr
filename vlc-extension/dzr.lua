@@ -8,10 +8,10 @@
 
 function descriptor()
     return {
-        title = "VLC Extension - Basic structure",
+        title = "Accountless Deezer Player on VLC",
         version = "1.0",
-        author = "",
-        url = 'http://',
+        author = "PitchHybrid",
+        url = 'https://github.com/pitchhybrid/dzr',
         shortdesc = "short description",
         description = "full description",
         capabilities = {"menu", "input-listener", "meta-listener", "playing-listener"}
@@ -19,13 +19,13 @@ function descriptor()
 end
 
 function activate()
-    -- this is where extension starts
-    -- for example activation of extension opens custom dialog box:
     create_dialog()
 end
+
 function deactivate()
     -- what should be done on deactivation of extension
 end
+
 function close()
     -- function triggered on dialog box close event
     -- for example to deactivate extension on dialog box close:
@@ -36,10 +36,12 @@ function input_changed()
     -- related to capabilities={"input-listener"} in descriptor()
     -- triggered by Start/Stop media input event
 end
+
 function playing_changed()
     -- related to capabilities={"playing-listener"} in descriptor()
     -- triggered by Pause/Play madia input event
 end
+
 function meta_changed()
     -- related to capabilities={"meta-listener"} in descriptor()
     -- triggered by available media input meta data?
