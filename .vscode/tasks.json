@@ -4,9 +4,14 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "echo",
+            "label": "Run VLC",
             "type": "shell",
-            "command": "cp ./vlc-extension/dzr.lua 'C:\\Program Files\\VideoLAN\\VLC\\lua\\extensions\\dzr.lua'"
+            "windows":{
+                "command": "cp ./vlc-extension/dzr.lua 'C:\\Users\\manoel.messias\\AppData\\Roaming\\vlc\\lua\\extensions\\dzr.lua' && start vlc",
+            },
+            "linux":{
+                "command": "cp ./vlc-extension/dzr.lua '~/.local/share/vlc/lua/extensions/dzr.lua' && vlc",
+            },
         }
     ]
 }

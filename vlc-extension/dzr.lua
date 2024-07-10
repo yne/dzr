@@ -5,31 +5,59 @@
 -- Windows: %APPDATA%/vlc/lua/extensions/basic.lua
 -- Mac:     /Applications/VLC/.../lua/extensions/basic.lua
 -- Linux:   ~/.local/share/vlc/lua/extensions/basic.lua
-
+title = "Accountless Deezer Player on VLC"
+logout = false
+CBC = "g4el58wc0zvf9na1"
+search_keys = {
+    {"Track", "/search/track?q=" },
+    {"Artist", "/search/artist?q=" },
+    {"Album", "/search/album?q=" },
+    {"Playlist", "/search/playlist?q=" },
+    {"User (name)", "/search/user?q=" },
+    {"User (id)", "/user/0" },
+    {"Radio", "/search/radio?q=" },
+    {"Genre (List)", "/genre" }, -- list
+    {"Radio (List)", "/radio" }, -- list
+}
 function descriptor()
     return {
-        title = "Accountless Deezer Player on VLC",
+        title = title,
         version = "1.0",
         author = "PitchHybrid",
         url = 'https://github.com/pitchhybrid/dzr',
-        shortdesc = "short description",
-        description = "full description",
-        capabilities = {"menu", "input-listener", "meta-listener", "playing-listener"}
+        shortdesc = "Deezer player",
+        description = "Accountless Deezer Player on VLC",
+        capabilities = {"input-listener", "meta-listener", "playing-listener"}
     }
 end
 
 function activate()
-    create_dialog()
+    mainWindow = vlc.dialog(title)
+    mainWindow:add_label("Search", 1, 1, 7, 1)
+    search_input = mainWindow:add_text_input("", 1, 2, 7, 1)
+    query_search = mainWindow:add_dropdown(1, 3, 7, 1)
+    for idx, val in ipairs(search_keys) do
+        query_search:add_value(search_keys[idx][1], idx)
+    end
+    mainWindow:show()
 end
 
 function deactivate()
     -- what should be done on deactivation of extension
+    if mainWindow then
+        mainWindow:hide()
+    end
+    if logout then
+        mainWindow:deactivate()
+    end
+
 end
 
 function close()
     -- function triggered on dialog box close event
     -- for example to deactivate extension on dialog box close:
     -- vlc.deactivate()
+    deactivate()
 end
 
 function input_changed()
@@ -68,7 +96,7 @@ end
 
 greeting = "Welcome!<br />"  -- example of global variable
 function create_dialog()
-    w = vlc.dialog("VLC Extension - Dialog box example")
+    w = vlc.dialog(title)
     w1 = w:add_text_input("Hello world!", 1, 1, 3, 1)
     w2 = w:add_html(greeting, 1, 2, 3, 1)
     w3 = w:add_button("Action!",click_Action, 1, 3, 1, 1)
