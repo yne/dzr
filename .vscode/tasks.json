@@ -7,10 +7,10 @@
             "label": "Run VLC",
             "type": "shell",
             "windows":{
-                "command": "cp ./vlc-extension/dzr.lua 'C:\\Users\\manoel.messias\\AppData\\Roaming\\vlc\\lua\\extensions\\dzr.lua' && start vlc",
+                "command": "luac5.1 -o ./vlc-extension/ex_dzr.luac -s ./vlc-extension/ex_dzr.lua && cp ./vlc-extension/ex_dzr.lua C:\\Users\\manoel.messias\\AppData\\Roaming\\vlc\\lua\\extensions\\ex_dzr.lua && start vlc"
             },
             "linux":{
-                "command": "cp ./vlc-extension/dzr.lua '~/.local/share/vlc/lua/extensions/dzr.lua' && vlc",
+                "command": "cp ./vlc-extension/ex_dzr.lua '~/.local/share/vlc/lua/extensions/ex_dzr.lua' && vlc",
             },
         }
     ]

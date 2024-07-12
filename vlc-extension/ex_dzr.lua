@@ -1,10 +1,13 @@
 -- "extension.lua"
 -- VLC Extension basic structure (template): ----------------
-
 -- Install
 -- Windows: %APPDATA%/vlc/lua/extensions/basic.lua
 -- Mac:     /Applications/VLC/.../lua/extensions/basic.lua
 -- Linux:   ~/.local/share/vlc/lua/extensions/basic.lua
+dkjson = require "dkjson"
+
+API_DEEZER = "https://api.deezer.com"
+
 title = "Accountless Deezer Player on VLC"
 logout = false
 CBC = "g4el58wc0zvf9na1"
@@ -12,17 +15,12 @@ CBC = "g4el58wc0zvf9na1"
 default_colspan = 70
 default_rowspan = 1
 
-search_keys = {
-    {"Track", "/search/track?q=" },
-    {"Artist", "/search/artist?q=" },
-    {"Album", "/search/album?q=" },
-    {"Playlist", "/search/playlist?q=" },
-    {"User (name)", "/search/user?q=" },
-    {"User (id)", "/user/0" },
-    {"Radio", "/search/radio?q=" },
-    {"Genre (List)", "/genre" }, -- list
-    {"Radio (List)", "/radio" }, -- list
+search_keys = {{"Track", "/search/track?q="}, {"Artist", "/search/artist?q="}, {"Album", "/search/album?q="},
+               {"Playlist", "/search/playlist?q="}, {"User (name)", "/search/user?q="}, {"User (id)", "/user/0"},
+               {"Radio", "/search/radio?q="}, {"Genre (List)", "/genre"}, -- list
+{"Radio (List)", "/radio"} -- list
 }
+
 function descriptor()
     return {
         title = title,
@@ -42,9 +40,9 @@ function activate()
     options = mainWindow:add_dropdown(1, 3, default_colspan, default_rowspan)
     mainWindow:add_button("Search", function()
         local val = options:get_value()
-        list:add_value(search_keys[val][1])
+        browse(val, search_input:get_text())
         mainWindow:update()
-        
+
     end, 1, 4, default_colspan, default_rowspan)
     list = mainWindow:add_list(1, 5, default_colspan, default_rowspan)
     for idx, val in ipairs(search_keys) do
@@ -71,35 +69,40 @@ function close()
     vlc.deactivate()
 end
 
---[[
-    function input_changed()
-        -- related to capabilities={"input-listener"} in descriptor()
-        -- triggered by Start/Stop media input event
-    end
-    
-    function playing_changed()
-        -- related to capabilities={"playing-listener"} in descriptor()
-        -- triggered by Pause/Play madia input event
-    end
-    
-    function meta_changed()
-        -- related to capabilities={"meta-listener"} in descriptor()
-        -- triggered by available media input meta data?
-    end
-    
-    function menu()
-        -- related to capabilities={"menu"} in descriptor()
-        -- menu occurs in VLC menu: View > Extension title > ...
-        return {"Menu item #1", "Menu item #2", "Menu item #3"}
-    end
-    -- Function triggered when an element from the menu is selected
-    function trigger_menu(id)
-        if(id == 1) then
-            --Menu_action1()
-        elseif(id == 2) then
-            --Menu_action2()
-        elseif(id == 3) then
-            --Menu_action3()
+function browse(id, query_terms)
+    local json = {
+        next = nil
+    }
+    local url = API_DEEZER .. search_keys[id][2] .. query_terms
+    local stream = vlc.stream(url)
+    if stream then
+        local status, data = pcall(function()
+            return stream:readline()
+        end)
+        if status then
+            json = dkjson.decode(data)['data']
+            for i = 1, #json do
+                debug(json[i]['id'])
+            end
+            if json.next then
+                url = json.next
+                debug(url)
+            else
+                json.next = nil
+            end
         end
     end
-]]
+end
+
+function debug(...)
+    vlc.msg.dbg(...)
+end
+
+function map(func, ...)
+    local args = {...}
+    local resultados = {}
+    for i, v in ipairs(args) do
+        resultados[i] = func(v)
+    end
+    return resultados
+end
