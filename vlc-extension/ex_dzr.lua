@@ -70,26 +70,23 @@ function close()
 end
 
 function browse(id, query_terms)
-    local json = {
-        next = nil
-    }
     local url = API_DEEZER .. search_keys[id][2] .. query_terms
     local stream = vlc.stream(url)
     if stream then
-        local status, data = pcall(function()
+        local status, json = pcall(function()
             return stream:readline()
         end)
         if status then
-            json = dkjson.decode(data)['data']
-            for i = 1, #json do
-                debug(json[i]['id'])
+            data = dkjson.decode(json)['data']
+            for i = 1, #data do
+                list:add_value(data[i]['title'], data[i]['id'])
             end
-            if json.next then
-                url = json.next
-                debug(url)
-            else
-                json.next = nil
-            end
+        end
+        if json.next then
+            url = json.next
+            debug(url)
+        else
+            json.next = nil
         end
     end
 end

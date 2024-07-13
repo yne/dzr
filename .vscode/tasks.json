@@ -6,12 +6,13 @@
         {
             "label": "Run VLC",
             "type": "shell",
-            "windows":{
+            "windows": {
                 "command": "luac5.1 -o ./vlc-extension/ex_dzr.luac -s ./vlc-extension/ex_dzr.lua && cp ./vlc-extension/ex_dzr.lua C:\\Users\\manoel.messias\\AppData\\Roaming\\vlc\\lua\\extensions\\ex_dzr.lua && start vlc"
             },
-            "linux":{
-                "command": "cp ./vlc-extension/ex_dzr.lua '~/.local/share/vlc/lua/extensions/ex_dzr.lua' && vlc",
+            "linux": {
+                "command": "luac5.1 -o ./vlc-extension/ex_dzr.luac -s ./vlc-extension/ex_dzr.lua && cp ./vlc-extension/ex_dzr.lua ~/.local/share/vlc/lua/extensions/ex_dzr.lua && vlc --verbose 2"
             },
+            "problemMatcher": []
         }
     ]
 }
