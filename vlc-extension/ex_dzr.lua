@@ -39,8 +39,9 @@ function activate()
     search_input = mainWindow:add_text_input("", 1, 2, default_colspan, default_rowspan)
     options = mainWindow:add_dropdown(1, 3, default_colspan, default_rowspan)
     mainWindow:add_button("Search", function()
-        local val = options:get_value()
-        browse(val, search_input:get_text())
+        local id = options:get_value()
+        local url = API_DEEZER .. search_keys[id][2] .. search_input:get_text()
+        browse(url)
         mainWindow:update()
 
     end, 1, 4, default_colspan, default_rowspan)
@@ -69,8 +70,7 @@ function close()
     vlc.deactivate()
 end
 
-function browse(id, query_terms)
-    local url = API_DEEZER .. search_keys[id][2] .. query_terms
+function browse(url)
     local stream = vlc.stream(url)
     if stream then
         local status, json = pcall(function()
@@ -79,7 +79,7 @@ function browse(id, query_terms)
         if status then
             data = dkjson.decode(json)['data']
             for i = 1, #data do
-                list:add_value(data[i]['title'], data[i]['id'])
+                list:add_value(data[i]['title'] .. " [ " .. data[i]['nb_tracks'] .. " ] " .. "( ".. data[i]['user']['name'] .." )", data[i]['id'])
             end
         end
         if json.next then
