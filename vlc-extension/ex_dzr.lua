@@ -12,25 +12,27 @@ title = "Accountless Deezer Player on VLC"
 logout = false
 CBC = "g4el58wc0zvf9na1"
 
-default_colspan = 70
+default_colspan = 2
 default_rowspan = 1
 
 next = nil
-prev = nil
 
 search_keys = {
-    {"Track", "/search/track?q="}, 
-    {"Artist", "/search/artist?q="}, 
-    {"Album", "/search/album?q="},
-    {"Playlist", "/search/playlist?q="}, 
-    {"User (name)", "/search/user?q="}, 
-    {"User (id)", "/user/0"},
-    {"Radio", "/search/radio?q="}
+    {   "Track",           "/search/track?q="      }, 
+    {   "Artist",          "/search/artist?q="     }, 
+    {   "Album",           "/search/album?q="      },
+    {   "Playlist",        "/search/playlist?q="   }, 
+    {   "User (name)",     "/search/user?q="       }, 
+    {   "Radio",           "/search/radio?q="      }
+}
+
+search_user = {
+    {   "User (id)",        "/user/0"              }
 }
 
 search_list = {
-    {"Genre (List)", "/genre"},
-    {"Radio (List)", "/radio"}
+    {   "Genre (List)",     "/genre"                },
+    {   "Radio (List)",     "/radio"                }
 }
 
 function descriptor()
@@ -57,8 +59,14 @@ function activate()
         if next then
             mainWindow:add_button("More", function()
                 browse(next)
-            end, 2, 6, 1, default_rowspan)
+            end, 1, 6, 1, default_rowspan)
         end
+        mainWindow:add_button("Play", function()
+            debug("playing .....")
+            local a = list:get_selection()
+            debug("itens", table.concat(a, ','))
+        end, 2, 6, 1, default_rowspan)
+
         mainWindow:update()
 
     end, 1, 4, default_colspan, default_rowspan)
@@ -68,22 +76,6 @@ function activate()
     end
 
     mainWindow:show()
-end
-
-function search(url)
-    browse(url)
-    if prev then
-        mainWindow:add_button("Prev", function ()
-            browse(prev)
-        end, 1, 6, 1, default_rowspan)
-    end
-    if next then
-        mainWindow:add_button("Next", function ()
-            browse(next)
-        end, 4, 6, 1, default_rowspan)
-    end
-
-    mainWindow:update()
 end
 
 function deactivate()
@@ -113,7 +105,7 @@ function browse(url)
             local json = dkjson.decode(response)
             local data = json['data']
             for i = 1, #data do
-                local label = {}
+                local label = {i}
                 if data[i]['title'] or data[i]['name'] then
                     table.insert(label, data[i]['title'] or data[i]['name'])
                 end
@@ -124,13 +116,11 @@ function browse(url)
                     table.insert(label, "- " .. data[i]['artist']['name'])
                 end
 
-                list:add_value(table.concat(label, ' '), data[i]['id']) 
+                list:add_value(table.concat(label, ' '), i)
+
             end
             if json.next then
                 next = json.next
-            end
-            if json.prev then
-                prev = json.prev
             end
         end
     end

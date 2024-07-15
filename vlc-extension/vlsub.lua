@@ -359,7 +359,7 @@ function interface_main()
 	input_table['mainlist'] = dlg:add_list(1, 5, 4, 1)
 	input_table['message'] = nil
 	input_table['message'] = dlg:add_label(' ', 1, 6, 4, 1)
-	dlg:add_button(lang["int_show_help"], show_help, 1, 7, 1, 1)dlg
+	dlg:add_button(lang["int_show_help"], show_help, 1, 7, 1, 1)
 	dlg:add_button('   '..lang["int_show_conf"]..'   ', show_conf, 2, 7, 1, 1)
 	dlg:add_button(lang["int_dowload_sel"], download_subtitles, 3, 7, 1, 1)
 	dlg:add_button(lang["int_close"], deactivate, 4, 7, 1, 1) 
