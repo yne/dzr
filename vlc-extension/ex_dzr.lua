@@ -15,8 +15,6 @@ CBC = "g4el58wc0zvf9na1"
 default_colspan = 2
 default_rowspan = 1
 
-next = nil
-
 search_keys = {
     {   "Track",           "/search/track?q="      }, 
     {   "Artist",          "/search/artist?q="     }, 
@@ -56,19 +54,7 @@ function activate()
         local id = options:get_value()
         local url = API_DEEZER .. search_keys[id][2] .. search_input:get_text()
         browse(url)
-        if next then
-            mainWindow:add_button("More", function()
-                browse(next)
-            end, 1, 6, 1, default_rowspan)
-        end
-        mainWindow:add_button("Play", function()
-            debug("playing .....")
-            local a = list:get_selection()
-            debug("itens", table.concat(a, ','))
-        end, 2, 6, 1, default_rowspan)
-
         mainWindow:update()
-
     end, 1, 4, default_colspan, default_rowspan)
     list = mainWindow:add_list(1, 5, default_colspan, default_rowspan)
     for idx, val in ipairs(search_keys) do
@@ -120,8 +106,16 @@ function browse(url)
 
             end
             if json.next then
-                next = json.next
+                mainWindow:add_button("More", function()
+                    browse(json.next)
+                end, 1, 6, 1, default_rowspan)
             end
+            mainWindow:add_button("Play", function()
+                debug("playing .....")
+                local a = list:get_selection()
+                debug("itens", #a)
+            end, 2, 6, 1, default_rowspan)
+
         end
     end
 end
