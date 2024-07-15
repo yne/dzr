@@ -15,10 +15,22 @@ CBC = "g4el58wc0zvf9na1"
 default_colspan = 70
 default_rowspan = 1
 
-search_keys = {{"Track", "/search/track?q="}, {"Artist", "/search/artist?q="}, {"Album", "/search/album?q="},
-               {"Playlist", "/search/playlist?q="}, {"User (name)", "/search/user?q="}, {"User (id)", "/user/0"},
-               {"Radio", "/search/radio?q="}, {"Genre (List)", "/genre"}, -- list
-{"Radio (List)", "/radio"} -- list
+next = nil
+prev = nil
+
+search_keys = {
+    {"Track", "/search/track?q="}, 
+    {"Artist", "/search/artist?q="}, 
+    {"Album", "/search/album?q="},
+    {"Playlist", "/search/playlist?q="}, 
+    {"User (name)", "/search/user?q="}, 
+    {"User (id)", "/user/0"},
+    {"Radio", "/search/radio?q="}
+}
+
+search_list = {
+    {"Genre (List)", "/genre"},
+    {"Radio (List)", "/radio"}
 }
 
 function descriptor()
@@ -38,12 +50,10 @@ function activate()
     mainWindow:add_label("description:", 1, 1, default_colspan, default_rowspan)
     search_input = mainWindow:add_text_input("", 1, 2, default_colspan, default_rowspan)
     options = mainWindow:add_dropdown(1, 3, default_colspan, default_rowspan)
-    mainWindow:add_button("Search", function()
+    mainWindow:add_button("Search", function ()
         local id = options:get_value()
         local url = API_DEEZER .. search_keys[id][2] .. search_input:get_text()
-        browse(url)
-        mainWindow:update()
-
+        search(url)
     end, 1, 4, default_colspan, default_rowspan)
     list = mainWindow:add_list(1, 5, default_colspan, default_rowspan)
     for idx, val in ipairs(search_keys) do
@@ -51,6 +61,22 @@ function activate()
     end
 
     mainWindow:show()
+end
+
+function search(url)
+    browse(url)
+    if prev then
+        mainWindow:add_button("Prev", function ()
+            browse(prev)
+        end, 1, 6, 1, default_rowspan)
+    end
+    if next then
+        mainWindow:add_button("Next", function ()
+            browse(next)
+        end, 4, 6, 1, default_rowspan)
+    end
+
+    mainWindow:update()
 end
 
 function deactivate()
@@ -73,22 +99,48 @@ end
 function browse(url)
     local stream = vlc.stream(url)
     if stream then
-        local status, json = pcall(function()
+        local response = try(function()
             return stream:readline()
         end)
-        if status then
-            data = dkjson.decode(json)['data']
+        if response then
+            local json = dkjson.decode(response)
+            local data = json['data']
             for i = 1, #data do
-                list:add_value(data[i]['title'] .. " [ " .. data[i]['nb_tracks'] .. " ] " .. "( ".. data[i]['user']['name'] .." )", data[i]['id'])
+                local label = {}
+                if data[i]['title'] or data[i]['name'] then
+                    table.insert(label, data[i]['title'] or data[i]['name'])
+                end
+                if data[i]['nb_tracks'] then
+                    table.insert(label, string.format("(%d)", data[i]['nb_tracks']))
+                end
+                if data[i]['artist'] and data[i]['artist']['name'] then
+                    table.insert(label, "- " .. data[i]['artist']['name'])
+                end
+
+                list:add_value(table.concat(label, ' '), data[i]['id']) 
+            end
+            if json.next then
+                next = json.next
+            end
+            if json.prev then
+                prev = json.prev
             end
         end
-        if json.next then
-            url = json.next
-            debug(url)
-        else
-            json.next = nil
-        end
     end
+end
+
+function try(f, ...)
+    local args = {...}
+    local status, output = pcall(function()
+        if #args > 0 then
+            return f(table.unpack(args))
+        end
+        return f()
+    end)
+    if status then
+        return output
+    end
+    return nil
 end
 
 function debug(...)
