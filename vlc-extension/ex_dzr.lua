@@ -53,7 +53,14 @@ function activate()
     mainWindow:add_button("Search", function ()
         local id = options:get_value()
         local url = API_DEEZER .. search_keys[id][2] .. search_input:get_text()
-        search(url)
+        browse(url)
+        if next then
+            mainWindow:add_button("More", function()
+                browse(next)
+            end, 2, 6, 1, default_rowspan)
+        end
+        mainWindow:update()
+
     end, 1, 4, default_colspan, default_rowspan)
     list = mainWindow:add_list(1, 5, default_colspan, default_rowspan)
     for idx, val in ipairs(search_keys) do
