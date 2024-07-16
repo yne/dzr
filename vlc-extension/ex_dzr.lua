@@ -33,6 +33,10 @@ search_list = {
     {   "Radio (List)",     "/radio"                }
 }
 
+map_selection = {}
+
+ui = {}
+
 function descriptor()
     return {
         title = title,
@@ -46,32 +50,48 @@ function descriptor()
 end
 
 function activate()
-    mainWindow = vlc.dialog(title)
-    mainWindow:add_label("description:", 1, 1, default_colspan, default_rowspan)
-    search_input = mainWindow:add_text_input("", 1, 2, default_colspan, default_rowspan)
-    options = mainWindow:add_dropdown(1, 3, default_colspan, default_rowspan)
-    mainWindow:add_button("Search", function ()
-        local id = options:get_value()
-        local url = API_DEEZER .. search_keys[id][2] .. search_input:get_text()
-        browse(url)
-        mainWindow:update()
-    end, 1, 4, default_colspan, default_rowspan)
-    list = mainWindow:add_list(1, 5, default_colspan, default_rowspan)
+    ui['main_window'] = vlc.dialog(title)
+    ui['main_window']:add_label("description:", 1, 1, default_colspan, default_rowspan)
+    ui['search_input'] = ui['main_window']:add_text_input("", 1, 2, default_colspan, default_rowspan)
+    ui['options'] = ui['main_window']:add_dropdown(1, 3, default_colspan, default_rowspan)
+    ui['search'] = ui['main_window']:add_button("Search", search_api, 1, 4, default_colspan, default_rowspan)
+    ui['list'] = ui['main_window']:add_list(1, 5, default_colspan, default_rowspan)
     for idx, val in ipairs(search_keys) do
-        options:add_value(search_keys[idx][1], idx)
+        ui['options']:add_value(search_keys[idx][1], idx)
     end
 
-    mainWindow:show()
+    ui['main_window']:show()
+end
+
+function search_api()
+    if json_next then
+        browse(json_next)
+    else
+        if #ui['search_input']:get_text() > 0 then
+            local id = ui['options']:get_value()
+            local url = API_DEEZER .. search_keys[id][2] .. ui['search_input']:get_text()
+            browse(url)
+        end
+    end
+    if next(map_selection) then
+        ui['main_window']:add_button("Play", play, 1, 6, default_colspan, default_rowspan)
+        for i, p in ipairs(map_selection) do
+            ui['list']:add_value(p.label)
+        end
+    end
+    if json_next then
+        ui['search']:set_text("More")
+    end
+    ui['main_window']:update()
 end
 
 function deactivate()
     -- what should be done on deactivation of extension
-    if mainWindow then
-        mainWindow:hide()
+    if ui['main_window'] then
+        ui['main_window']:hide()
     end
-
     if logout then
-        mainWindow:deactivate()
+        ui['main_window']:deactivate()
     end
 end
 
@@ -81,17 +101,30 @@ function close()
     vlc.deactivate()
 end
 
+function play()
+    debug("playing .....")
+    local a = ui['list']:get_selection()
+    debug("itens", dkjson.encode(a))
+end
+
+function select_itens(sel_itens)
+    for i, v in ipairs(sel_itens) do
+        
+    end
+end
+
 function browse(url)
+    ui['list']:clear()
     local stream = vlc.stream(url)
     if stream then
-        local response = try(function()
+       local response = try(function()
             return stream:readline()
         end)
         if response then
             local json = dkjson.decode(response)
             local data = json['data']
             for i = 1, #data do
-                local label = {i}
+                local label = {}
                 if data[i]['title'] or data[i]['name'] then
                     table.insert(label, data[i]['title'] or data[i]['name'])
                 end
@@ -101,21 +134,16 @@ function browse(url)
                 if data[i]['artist'] and data[i]['artist']['name'] then
                     table.insert(label, "- " .. data[i]['artist']['name'])
                 end
-
-                list:add_value(table.concat(label, ' '), i)
-
+                table.insert(map_selection,
+                    {
+                        id = data[i]['id'],
+                        label = table.concat(label, ' '),
+                        entry = data[i]        
+                    })
             end
             if json.next then
-                mainWindow:add_button("More", function()
-                    browse(json.next)
-                end, 1, 6, 1, default_rowspan)
+                json_next = json.next
             end
-            mainWindow:add_button("Play", function()
-                debug("playing .....")
-                local a = list:get_selection()
-                debug("itens", #a)
-            end, 2, 6, 1, default_rowspan)
-
         end
     end
 end
@@ -145,4 +173,14 @@ function map(func, ...)
         resultados[i] = func(v)
     end
     return resultados
+end
+
+function filter(table, predicate)
+    local result = {}
+    for key, value in pairs(table) do
+        if predicate(value) then
+            result[key] = value
+        end
+    end
+    return result
 end
