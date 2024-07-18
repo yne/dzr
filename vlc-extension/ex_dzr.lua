@@ -76,7 +76,7 @@ function search_api()
     if next(map_selection) then
         ui['main_window']:add_button("Play", play, 1, 6, default_colspan, default_rowspan)
         for i, p in ipairs(map_selection) do
-            ui['list']:add_value(p.label)
+            ui['list']:add_value(p.label, p.id)
         end
     end
     if json_next then
