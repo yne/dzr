@@ -119,7 +119,7 @@ function select(value)
     for i, itens in ipairs(map_selection) do
         for k, v in pairs(itens) do
             if k == 'id' and tostring(v) == tostring(value) then
-                table.insert(selection,#selection + 1, itens )
+                table.insert(selection, #selection + 1, itens )
             end
         end
     end
