@@ -115,6 +115,7 @@ function select_itens(sel_itens)
 end
 
 function select(value)
+    selection = {}
     for i, itens in ipairs(map_selection) do
         for k, v in pairs(itens) do
             if k == 'id' and tostring(v) == tostring(value) then
