@@ -34,6 +34,7 @@ search_list = {
 }
 
 map_selection = {}
+selection = {}
 
 ui = {}
 
@@ -76,7 +77,7 @@ function search_api()
     if next(map_selection) then
         ui['main_window']:add_button("Play", play, 1, 6, default_colspan, default_rowspan)
         for i, p in ipairs(map_selection) do
-            ui['list']:add_value(p.label, p.id)
+            ui['list']:add_value(p.label, tostring(p.id))
         end
     end
     if json_next then
@@ -103,13 +104,23 @@ end
 
 function play()
     debug("playing .....")
-    local a = ui['list']:get_selection()
-    debug("itens", dkjson.encode(a))
+    select_itens(ui['list']:get_selection())
+    debug(dkjson.encode(selection))
 end
 
 function select_itens(sel_itens)
-    for i, v in ipairs(sel_itens) do
-        
+    for k, v in pairs(sel_itens) do
+        select(k)
+    end
+end
+
+function select(value)
+    for i, itens in ipairs(map_selection) do
+        for k, v in pairs(itens) do
+            if k == 'id' and tostring(v) == tostring(value) then
+                table.insert(selection,#selection + 1, itens )
+            end
+        end
     end
 end
 
@@ -134,7 +145,7 @@ function browse(url)
                 if data[i]['artist'] and data[i]['artist']['name'] then
                     table.insert(label, "- " .. data[i]['artist']['name'])
                 end
-                table.insert(map_selection,
+                table.insert(map_selection, #map_selection + 1,
                     {
                         id = data[i]['id'],
                         label = table.concat(label, ' '),
