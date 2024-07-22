@@ -36,6 +36,8 @@ search_list = {
 map_selection = {}
 selection = {}
 
+tracks = {}
+
 ui = {}
 
 function descriptor()
@@ -70,7 +72,8 @@ function search_api()
     else
         if #ui['search_input']:get_text() > 0 then
             local id = ui['options']:get_value()
-            local url = API_DEEZER .. search_keys[id][2] .. ui['search_input']:get_text()
+            local url = url_encode(API_DEEZER .. search_keys[id][2] .. ui['search_input']:get_text())
+            debug(dkjson.encode(url))
             browse(url)
         end
     end
@@ -105,25 +108,26 @@ end
 function play()
     debug("playing .....")
     select_itens(ui['list']:get_selection())
-    debug(dkjson.encode(selection))
+    for _, v in ipairs(selection) do
+       debug(v.play_type) 
+    end
 end
 
 function select_itens(sel_itens)
-    for k, v in pairs(sel_itens) do
-        select(k)
-    end
-end
-
-function select(value)
     selection = {}
-    for i, itens in ipairs(map_selection) do
-        for k, v in pairs(itens) do
-            if k == 'id' and tostring(v) == tostring(value) then
-                table.insert(selection, #selection + 1, itens )
+    for k, v in pairs(sel_itens) do
+        for i, itens in ipairs(map_selection) do
+            for k, v in pairs(itens) do
+                if k == 'id' and tostring(v) == tostring(k) then
+                    table.insert(selection, #selection + 1, itens )
+                end
             end
         end
     end
+    
 end
+
+
 
 function browse(url)
     ui['list']:clear()
@@ -135,6 +139,7 @@ function browse(url)
         if response then
             local json = dkjson.decode(response)
             local data = json['data']
+            local play_type = search_keys[ui['options']:get_value()][2]
             for i = 1, #data do
                 local label = {}
                 if data[i]['title'] or data[i]['name'] then
@@ -150,6 +155,7 @@ function browse(url)
                     {
                         id = data[i]['id'],
                         label = table.concat(label, ' '),
+                        play_type,
                         entry = data[i]        
                     })
             end
@@ -176,6 +182,13 @@ end
 
 function debug(...)
     vlc.msg.dbg(...)
+end
+
+function url_encode(str)
+    str = string.gsub(str, "([^%w-_%.~])", function(c)
+        return string.format("%%%02X", string.byte(c))
+    end)
+    return str
 end
 
 function map(func, ...)
