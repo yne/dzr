@@ -36,7 +36,7 @@ search_list = {
 map_selection = {}
 selection = {}
 
-tracks = {}
+play_type = nil
 
 ui = {}
 
@@ -72,8 +72,8 @@ function search_api()
     else
         if #ui['search_input']:get_text() > 0 then
             local id = ui['options']:get_value()
+            play_type = search_keys[id][1]
             local url = url_encode(API_DEEZER .. search_keys[id][2] .. ui['search_input']:get_text())
-            debug(dkjson.encode(url))
             browse(url)
         end
     end
@@ -108,26 +108,38 @@ end
 function play()
     debug("playing .....")
     select_itens(ui['list']:get_selection())
-    for _, v in ipairs(selection) do
-       debug(v.play_type) 
+    for i, v in ipairs(selection) do
+        if v.play_type == "Track" then
+        
+        elseif v.play_type == "Artist" then
+
+        elseif v.play_type == "Album" then
+
+        elseif v.play_type == "Playlist" then
+        
+        elseif v.play_type == "Radio" then
+        
+        end
+        debug(dkjson.encode())
     end
 end
 
 function select_itens(sel_itens)
     selection = {}
     for k, v in pairs(sel_itens) do
-        for i, itens in ipairs(map_selection) do
-            for k, v in pairs(itens) do
-                if k == 'id' and tostring(v) == tostring(k) then
-                    table.insert(selection, #selection + 1, itens )
-                end
+        select(k)
+    end
+end
+
+function select(value)
+    for i, itens in ipairs(map_selection) do
+        for k, v in pairs(itens) do
+            if k == 'id' and tostring(v) == tostring(value) then
+                table.insert(selection, #selection + 1, itens )
             end
         end
     end
-    
 end
-
-
 
 function browse(url)
     ui['list']:clear()
@@ -139,7 +151,6 @@ function browse(url)
         if response then
             local json = dkjson.decode(response)
             local data = json['data']
-            local play_type = search_keys[ui['options']:get_value()][2]
             for i = 1, #data do
                 local label = {}
                 if data[i]['title'] or data[i]['name'] then
@@ -154,8 +165,8 @@ function browse(url)
                 table.insert(map_selection, #map_selection + 1,
                     {
                         id = data[i]['id'],
+                        play_type = play_type,
                         label = table.concat(label, ' '),
-                        play_type,
                         entry = data[i]        
                     })
             end
@@ -164,6 +175,27 @@ function browse(url)
             end
         end
     end
+end
+
+function fetch(url, limit)
+    local stream = vlc.stream(url .. "&limit=" .. limit)
+    if stream then
+       local response = try(function()
+            return stream:readline()
+        end)
+        if response then
+            local json = dkjson.decode(response)
+
+            if json.next then
+                return json.next
+            end
+        end
+    end
+    return nil
+end
+
+function add_to_map_selection(map_selection, value)
+    
 end
 
 function try(f, ...)
@@ -184,13 +216,6 @@ function debug(...)
     vlc.msg.dbg(...)
 end
 
-function url_encode(str)
-    str = string.gsub(str, "([^%w-_%.~])", function(c)
-        return string.format("%%%02X", string.byte(c))
-    end)
-    return str
-end
-
 function map(func, ...)
     local args = {...}
     local resultados = {}
@@ -208,4 +233,32 @@ function filter(table, predicate)
         end
     end
     return result
+end
+
+function url_encode0(str)
+    -- Mantém caracteres URL seguros: : / ? & =
+    str = string.gsub(str, "([^%w-_.~:/?&=])", function(c)
+        return string.format("%%%02X", string.byte(c))
+    end)
+    return str
+end
+
+function url_encode(text)
+    -- Preservar prefixo de URL se existir (http, https, ftp, etc.)
+    local prefix, rest = string.match(text, "^(%a+://)(.*)$")
+    if not prefix then
+        prefix = ""
+        rest = text
+    end
+
+    -- Substituir espaços por hífens
+    rest = string.gsub(rest, " ", "-")
+    -- Converter para minúsculas
+    rest = string.lower(rest)
+    -- Remover todos os caracteres não alfanuméricos (exceto hífens e os já permitidos em URLs)
+    rest = string.gsub(rest, "[^%w-_.~:/?&=]", "")
+    -- Aplicar percent-encoding
+    rest = url_encode0(rest)
+
+    return prefix .. rest
 end
