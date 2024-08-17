@@ -193,8 +193,15 @@
 				},
 				"dzr.secure": {
 					"type": "boolean",
-					"default": true,
+					"default": false,
 					"description": "Disable if you are behind a corporate proxy"
+				},
+				"dzr.volume": {
+					"type": "number",
+					"default": 1,
+					"minimum": 0,
+					"maximum": 1,
+					"description": "Player volume [0..1], Applied at next track play"
 				},
 				"dzr.queue": {
 					"type": "array",
@@ -213,7 +220,7 @@
 				},
 				"dzr.menus": {
 					"type": "object",
-					"description": "API tree (this they endpoint are not RESTful)",
+					"description": "API tree (since deezer endpoint are not RESTful)",
 					"default": {
 						"_": [
 							{
@@ -328,6 +335,7 @@
 				"dzr.type2icon": {
 					"type": "object",
 					"description": "VSCode picker icon to display according to item type",
+					"additionalProperties": true,
 					"default": {
 						"track": "$(play-circle) ",
 						"artist": "$(person) ",
@@ -336,6 +344,11 @@
 						"radio": "$(broadcast) ",
 						"genre": "$(telescope) ",
 						"user": "$(account) "
+					},
+					"patternProperties": {
+						".*": {
+							"type": "string"
+						}
 					}
 				}
 			}

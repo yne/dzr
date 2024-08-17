@@ -20,6 +20,7 @@ const fetch = (url, opt, data) => new Promise((resolve, reject) => {
 // - not restful, so we can't infer it structure
 // - /track/:id gives contributors but /search/track?q= don't
 // - inconsistent listing structure (/playlist/:id => tracks.data, sometimes=>data, sometimes data.tracks)
+
 // browse can be called from: user query / self list(from static menu) / self list(from fetch result)
 async function browse(url_or_event_or_ids, label) {
 	try {
@@ -125,7 +126,7 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 		this.statuses[1].text = this.state.ready ? label.length < 20 ? label : (label.slice(0, 20) + '…') : "$(play)"
 		this.statuses[2].text = this.state.ready && this.state.queue.length ? `${index + 1 || '?'}/${this.state.queue.length} $(chevron-right)` : null;//debug-step-over
 		this.treeView.description = (this.state.queue?.length ? `${index + 1 || '?'}/${this.state.queue.length}` : '') + ` loop:${this.state.looping}`;
-		this.treeView.message = this.state.queue?.length ? null : "Empty Queue. Add tracks to queue using '+'";
+		this.treeView.message = this.state.queue?.length ? null : "Empty Queue. Add tracks from the '+' menu";
 	}
 	async show(htmlUri, iconPath) {
 		if (this.panel) return this.panel.reveal(vscode.ViewColumn.One);
@@ -136,7 +137,7 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 		});
 		this.panel.iconPath = iconPath;
 		this.panel.webview.html = (await vscode.workspace.fs.readFile(htmlUri)).toString();
-		this.panel.webview.onDidReceiveMessage((action, ...args) => this[action] ? this[action](...args) : this.badAction(action));
+		this.panel.webview.onDidReceiveMessage(([action, ...args]=[]) => this[action] ? this[action](...args) : this.badAction(action));
 		this.panel.onDidDispose(() => this.state.ready = this.panel = null);
 		this.post('state', this.state, Object.keys(this.state));
 	}
@@ -147,6 +148,7 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 		this.waitAckSemaphore();
 		this.initAckSemaphore();
 	}
+	player_volumechange({volume}) { conf().update("volume", volume, vscode.ConfigurationTarget.Global); }
 	player_playing() { this.state.ready = this.state.playing = true; }
 	player_pause() { this.state.playing = false; }
 	player_ended() { vscode.commands.executeCommand('dzr.load', null); }
@@ -236,16 +238,16 @@ exports.activate = async function (/**@type {import('vscode').ExtensionContext}*
 				vscode.commands.executeCommand('dzr.show');
 				while (!dzr.state.ready) await wait();
 			}
-			dzr.state.current = dzr.state.queue[pos];
-			if ((dzr.state.current.expire || 0) < (new Date() / 1000)) {
+			if ((dzr.state.queue[pos].expire || 0) < (new Date() / 1000)) {
 				dzr.state.queue = await with_url(dzr.state.queue);//TODO: hope item is now up to date
 			}
+			dzr.state.current = dzr.state.queue[pos];
 			const hex = (str) => str.split('').map(c => c.charCodeAt(0))
 			const md5 = hex(crypto.createHash('md5').update(`${dzr.state.current.id}`).digest('hex'));
 			const key = Buffer.from(hex(conf().get('cbc')).map((c, i) => c ^ md5[i] ^ md5[i + 16]));
 			const iv = Buffer.from([0, 1, 2, 3, 4, 5, 6, 7]);
 			const stripe = 2048;//TODO:use .pipe() API https://codereview.stackexchange.com/questions/57492/
-			dzr.post('open', dzr.state.current);
+			dzr.post('open', dzr.state.current, conf().get("volume"));
 			const buf_enc = await fetch(dzr.state.current.url);
 			for (let pos = 0; pos < buf_enc.length; pos += stripe) {
 				if ((pos >> 11) % 3) continue;
