@@ -12,7 +12,12 @@
             "linux": {
                 "command": "luac5.1 -o ./vlc-extension/ex_dzr.luac -s ./vlc-extension/ex_dzr.lua && cp ./vlc-extension/ex_dzr.lua ~/.local/share/vlc/lua/extensions/ex_dzr.lua && vlc --verbose 2"
             },
-            "problemMatcher": []
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+
         }
     ]
 }

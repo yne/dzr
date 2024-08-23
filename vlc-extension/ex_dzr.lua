@@ -36,6 +36,8 @@ search_list = {
 map_selection = {}
 selection = {}
 
+tracks = {};
+
 play_type = nil
 
 ui = {}
@@ -70,10 +72,16 @@ function search_api()
     if json_next then
         browse(json_next)
     else
-        if #ui['search_input']:get_text() > 0 then
+        if search_input and search_input ~= ui['search_input']:get_text() then
+            json_next = nil
+            ui['search']:set_text("Search")
+            ui['main_window']:update()
+        end
+        search_input = ui['search_input']:get_text()
+        if #search_input > 0 then
             local id = ui['options']:get_value()
             play_type = search_keys[id][1]
-            local url = url_encode(API_DEEZER .. search_keys[id][2] .. ui['search_input']:get_text())
+            local url = url_encode(API_DEEZER .. search_keys[id][2] .. search_input)
             browse(url)
         end
     end
@@ -110,18 +118,23 @@ function play()
     select_itens(ui['list']:get_selection())
     for i, v in ipairs(selection) do
         if v.play_type == "Track" then
-        
-        elseif v.play_type == "Artist" then
-
-        elseif v.play_type == "Album" then
-
-        elseif v.play_type == "Playlist" then
-        
-        elseif v.play_type == "Radio" then
-        
+            table.insert(tracks, #tracks + 1, v['entry'])
+        else
+            local tracklist = v['entry']['tracklist']
+            debug(tracklist)
+            if v['entry']['nb_tracks'] then
+                tracklist = tracklist .. "&limit=" .. v['entry']['nb_tracks']
+            end
+            fetch(tracklist, function (response)
+                local json = dkjson.decode(response)
+                local data = json['data']
+                for i = 1, #data do
+                    table.insert(tracks, #tracks + 1, data[i])
+                end
+            end)
         end
-        debug(dkjson.encode())
     end
+    debug(dkjson.encode(tracks))
 end
 
 function select_itens(sel_itens)
@@ -143,55 +156,51 @@ end
 
 function browse(url)
     ui['list']:clear()
+    fetch(url, function (response)
+        local json = dkjson.decode(response)
+        local data = json['data']
+        for i = 1, #data do
+            local label = {}
+            if data[i]['artist'] and data[i]['artist']['name'] then
+                table.insert(label, data[i]['artist']['name'])
+            end
+            if data[i]['title'] or data[i]['name'] then
+                table.insert(label, (data[i]['title'] or data[i]['name']))
+            end
+            if data[i]['nb_tracks'] then
+                table.insert(label, string.format(" (%d)", data[i]['nb_tracks']))
+            end
+            table.insert(map_selection, #map_selection + 1, {
+                id = data[i]['id'],
+                play_type = play_type,
+                label = table.concat(label, ' '),
+                entry = data[i]
+            })
+        end
+        if json.next then
+            json_next = json.next
+        end
+
+    end)
+end
+
+-- local json = dkjson.decode(response)
+
+-- if json.next then
+--     return json.next
+-- end
+
+
+function fetch(url, callback)
     local stream = vlc.stream(url)
     if stream then
        local response = try(function()
             return stream:readline()
         end)
         if response then
-            local json = dkjson.decode(response)
-            local data = json['data']
-            for i = 1, #data do
-                local label = {}
-                if data[i]['title'] or data[i]['name'] then
-                    table.insert(label, data[i]['title'] or data[i]['name'])
-                end
-                if data[i]['nb_tracks'] then
-                    table.insert(label, string.format("(%d)", data[i]['nb_tracks']))
-                end
-                if data[i]['artist'] and data[i]['artist']['name'] then
-                    table.insert(label, "- " .. data[i]['artist']['name'])
-                end
-                table.insert(map_selection, #map_selection + 1,
-                    {
-                        id = data[i]['id'],
-                        play_type = play_type,
-                        label = table.concat(label, ' '),
-                        entry = data[i]        
-                    })
-            end
-            if json.next then
-                json_next = json.next
-            end
+           callback(response)
         end
     end
-end
-
-function fetch(url, limit)
-    local stream = vlc.stream(url .. "&limit=" .. limit)
-    if stream then
-       local response = try(function()
-            return stream:readline()
-        end)
-        if response then
-            local json = dkjson.decode(response)
-
-            if json.next then
-                return json.next
-            end
-        end
-    end
-    return nil
 end
 
 function add_to_map_selection(map_selection, value)
