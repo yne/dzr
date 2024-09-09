@@ -65,25 +65,30 @@ const with_url = async (songs) => songs?.length ? await vscode.window.withProgre
 		const base = next("https://www.deezer.com/ajax/gw-light.php?input=3&api_version=1.0");
 		const DZR_PNG = next(await gw('deezer.ping'));
 		const USR_NFO = next(await gw('deezer.getUserData', DZR_PNG.SESSION));
-		const SNG_NFO = next(await gw('song.getListData', DZR_PNG.SESSION, USR_NFO.checkForm, { method: 'POST' }, JSON.stringify({ sng_ids: songs.map(s => s.id) })));
-		const URL_NFO = next(JSON.parse(await fetch('https://media.deezer.com/v1/get_url', { method: 'POST' }, JSON.stringify({
-			track_tokens: SNG_NFO.data.map(d => d.TRACK_TOKEN),
+		const SNG_NFO = next(await gw('song.getListData', DZR_PNG.SESSION, USR_NFO.checkForm, { method: 'POST' }, JSON.stringify({ sng_ids: songs.map(s => s.id) }))).data.map(e => e.FALLBACK || e);
+		next(JSON.parse(await fetch('https://media.deezer.com/v1/get_url', { method: 'POST' }, JSON.stringify({
+			track_tokens: SNG_NFO.map(d => d.TRACK_TOKEN),
 			license_token: USR_NFO.USER.OPTIONS.license_token,
 			media: [{ type: "FULL", formats: [{ cipher: "BF_CBC_STRIPE", format: "MP3_128" }] }]
-		}))));
-		const errors = URL_NFO.data.map((nfo, i) => [nfo.errors, songs[i]]).filter(([err]) => err).map(([[err], sng]) => `${sng.title}: ${err.message} (${err.code})`).join('\n');
-		if (errors) setTimeout(() => vscode.window.showWarningMessage(errors), 500); // can't warn while progress ?
-		return songs.map(({ id }, i) => ({
-			id,
-			md5_image: SNG_NFO.data[i].ALB_PICTURE,
-			duration: +SNG_NFO.data[i].DURATION,
-			title: SNG_NFO.data[i].SNG_TITLE.replace(/ ?\(feat.*?\)/, ''),
-			artists: SNG_NFO.data[i].ARTISTS.map(a => ({ id: a.ART_ID, name: a.ART_NAME, md5: a.ART_PICTURE })),
-			size: +SNG_NFO.data[i].FILESIZE,
-			expire: SNG_NFO.data[i].TRACK_TOKEN_EXPIRE,
-			url: URL_NFO.data[i].media?.[0]?.sources?.[0]?.url
-		})).filter(sng => sng.url);
-	} catch (e) { console.error(e) }
+		})))).data.map((url, i) => Object.assign(SNG_NFO[i], url));
+		const errors = SNG_NFO.filter(e => e.errors).map(e => `[${e.SNG_ID}] ${e.ART_NAME} - ${e.SNG_TITLE}:${JSON.stringify(e.errors)}`);
+		const skiped = SNG_NFO.filter(s => !s.media?.[0]?.sources?.[0]?.url).map(e => `[${e.SNG_ID}] no MEDIA`);
+		if (errors.length || skiped.length) vscode.window.showWarningMessage([...errors, ...skiped].join('\n'));
+		return SNG_NFO.map(nfo => ({
+			id: nfo.SNG_ID,
+			md5_image: nfo.ALB_PICTURE,
+			duration: +nfo.DURATION,
+			title: nfo.SNG_TITLE.replace(/ ?\(feat.*?\)/, ''),
+			artists: (nfo.ARTISTS || []).map(a => ({ id: a.ART_ID, name: a.ART_NAME, md5: a.ART_PICTURE })),
+			size: +nfo.FILESIZE,
+			expire: nfo.TRACK_TOKEN_EXPIRE,
+			url: nfo.media?.[0]?.sources?.[0]?.url
+		})).filter(nfo => nfo.url);
+	} catch (e) {
+		console.error(e);
+		vscode.window.showErrorMessage(e);
+		return []
+	}
 }) : [];
 
 class DzrWebView { // can't Audio() in VSCode, we need a webview
@@ -137,7 +142,7 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 		});
 		this.panel.iconPath = iconPath;
 		this.panel.webview.html = (await vscode.workspace.fs.readFile(htmlUri)).toString();
-		this.panel.webview.onDidReceiveMessage(([action, ...args]=[]) => this[action] ? this[action](...args) : this.badAction(action));
+		this.panel.webview.onDidReceiveMessage(([action, ...args] = []) => this[action] ? this[action](...args) : this.badAction(action));
 		this.panel.onDidDispose(() => this.state.ready = this.panel = null);
 		this.post('state', this.state, Object.keys(this.state));
 	}
@@ -148,7 +153,7 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 		this.waitAckSemaphore();
 		this.initAckSemaphore();
 	}
-	player_volumechange({volume}) { conf().update("volume", volume, vscode.ConfigurationTarget.Global); }
+	player_volumechange({ volume }) { conf().update("volume", volume, vscode.ConfigurationTarget.Global); }
 	player_playing() { this.state.ready = this.state.playing = true; }
 	player_pause() { this.state.playing = false; }
 	player_ended() { vscode.commands.executeCommand('dzr.load', null); }
