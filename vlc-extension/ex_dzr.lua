@@ -89,7 +89,7 @@ function search_api()
         end
     end
     if next(map_selection) then
-        ui['main_window']:add_button("Play", play, 1, 6, default_colspan, default_rowspan)
+        ui['main_window']:add_button("Play", compile_tracks, 1, 6, default_colspan, default_rowspan)
         for i, p in ipairs(map_selection) do
             ui['list']:add_value(p.label, tostring(p.id))
         end
@@ -116,8 +116,7 @@ function close()
     vlc.deactivate()
 end
 
-function play()
-    debug("playing .....")
+function compile_tracks()
     select_itens(ui['list']:get_selection())
     for i, v in ipairs(selection) do
         if v.play_type == "Track" then
@@ -136,9 +135,10 @@ function play()
             end)
         end
     end
-    
-    -- Throw To SD
+end
 
+function play()
+    debug(dkjson.encode(tracks))
 end
 
 function select_itens(sel_itens)
