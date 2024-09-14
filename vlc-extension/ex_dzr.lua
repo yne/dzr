@@ -8,6 +8,8 @@ dkjson = require "dkjson"
 
 API_DEEZER = "https://api.deezer.com"
 
+GW_LIGHT = "https://www.deezer.com/ajax/gw-light.php?input=3&api_version=1.0"
+
 title = "Accountless Deezer Player on VLC"
 logout = false
 CBC = "g4el58wc0zvf9na1"
@@ -69,6 +71,7 @@ function activate()
 end
 
 function search_api()
+
     if json_next then
         browse(json_next)
     else
@@ -121,7 +124,6 @@ function play()
             table.insert(tracks, #tracks + 1, v['entry'])
         else
             local tracklist = v['entry']['tracklist']
-            debug(tracklist)
             if v['entry']['nb_tracks'] then
                 tracklist = tracklist .. "&limit=" .. v['entry']['nb_tracks']
             end
@@ -134,7 +136,9 @@ function play()
             end)
         end
     end
-    debug(dkjson.encode(tracks))
+    
+    -- Throw To SD
+
 end
 
 function select_itens(sel_itens)
@@ -184,15 +188,9 @@ function browse(url)
     end)
 end
 
--- local json = dkjson.decode(response)
-
--- if json.next then
---     return json.next
--- end
-
-
 function fetch(url, callback)
     local stream = vlc.stream(url)
+    debug(stream)
     if stream then
        local response = try(function()
             return stream:readline()
@@ -203,9 +201,6 @@ function fetch(url, callback)
     end
 end
 
-function add_to_map_selection(map_selection, value)
-    
-end
 
 function try(f, ...)
     local args = {...}
@@ -222,7 +217,7 @@ function try(f, ...)
 end
 
 function debug(...)
-    vlc.msg.dbg(...)
+    vlc.msg.info(...)
 end
 
 function map(func, ...)
@@ -243,6 +238,9 @@ function filter(table, predicate)
     end
     return result
 end
+
+
+-- NET UTILS -- 
 
 function url_encode0(str)
     -- Mantém caracteres URL seguros: : / ? & =
