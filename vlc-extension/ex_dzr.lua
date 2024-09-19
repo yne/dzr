@@ -8,8 +8,6 @@ dkjson = require "dkjson"
 
 API_DEEZER = "https://api.deezer.com"
 
-GW_LIGHT = "https://www.deezer.com/ajax/gw-light.php?input=3&api_version=1.0"
-
 title = "Accountless Deezer Player on VLC"
 logout = false
 CBC = "g4el58wc0zvf9na1"
@@ -43,6 +41,35 @@ tracks = {};
 play_type = nil
 
 ui = {}
+
+GW_META = {
+    __call = function(table)
+        table = table or {}
+        local method = table.method or ""
+        local sid = table.sid or ""
+        local api_token = table.api_token or "''"
+        local opt = table.opt or {}
+        local data = table.data or ""
+
+        local type = 'GET'
+        if next(opt) ~= nil then
+            type = opt['method'] or 'GET'
+        end
+        
+        local URL = "https://www.deezer.com/ajax/gw-light.php?input=3&api_version=1.0" .. "&method=" .. method .. "&api_token=" .. api_token
+        
+        local headers = {
+            Cookie = "sid=" .. sid
+        }
+
+        if type == 'POST' then
+            return post(URL, headers, data)
+        else
+            return get(URL, headers)
+        end
+
+    end
+}
 
 function descriptor()
     return {
@@ -135,11 +162,24 @@ function compile_tracks()
             end)
         end
     end
+    play()
+end
+
+function gw(callableTable)
+    setmetatable(callableTable, GW_META)
+    return callableTable()
 end
 
 function play()
-    debug(dkjson.encode(tracks))
+    debug("playing .....")
+    -- deezer.ping
+    local DZR_PNG = gw({
+        method = 'deezer.ping', api_token = ''
+    })
+    debug(DZR_PNG)
 end
+
+
 
 function select_itens(sel_itens)
     selection = {}
@@ -190,7 +230,6 @@ end
 
 function fetch(url, callback)
     local stream = vlc.stream(url)
-    debug(stream)
     if stream then
        local response = try(function()
             return stream:readline()
@@ -201,6 +240,54 @@ function fetch(url, callback)
     end
 end
 
+function heading(headers)
+    local param = {}
+    local cookie = ''
+    if headers then
+        for k, v in pairs(headers) do
+            if k == 'Cookie' then
+                cookie = '-b "' .. v .. '"'
+            else
+                table.insert(param, #param + 1, '-H "' .. k .. ': ' .. v .. '"')
+            end
+        end
+    end
+    table.insert(param, #param + 1, cookie)
+    return table.concat(param, ' ')
+end
+
+
+function get(url, headers)
+    headers = headers or ''
+    if type(headers) == 'table' then
+        headers = heading(headers)
+    end
+
+    local command = 'curl -s ' .. headers .. ' "' .. url .. '" '
+    debug(command)
+    local handle = io.popen(command)
+    local response = handle:read("*a")
+    handle:close()
+    return response
+
+end
+
+function post_data(url, headers, data)
+    headers = headers or ''
+    if type(headers) == 'table' then
+        headers = heading(headers)
+    end
+
+    
+    data = dkjson.encode(data) or ''
+    
+    local command = 'curl -s -X POST ' .. headers .. ' -d "'.. data ..'" "' .. url .. '"'
+
+    local handle = io.popen(command)
+    local response = handle:read("*a")
+    handle:close()
+    return response
+end
 
 function try(f, ...)
     local args = {...}
