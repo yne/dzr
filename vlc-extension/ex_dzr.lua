@@ -171,12 +171,31 @@ function gw(callableTable)
 end
 
 function play()
+    local function _gw(args)
+        return dkjson.decode(gw(args)).results
+    end
     debug("playing .....")
     -- deezer.ping
-    local DZR_PNG = gw({
-        method = 'deezer.ping', api_token = ''
+    local DZR_PNG = _gw({
+        method = 'deezer.ping', 
+        api_token = ''
     })
-    debug(DZR_PNG)
+    local USR_NFO = _gw({
+        method = 'deezer.getUserData', 
+        sid = DZR_PNG['SESSION']
+    })
+    local SNG_NFO = _gw({
+        method = 'song.getListData',
+        sid = DZR_PNG['SESSION'],
+        api_token = USR_NFO['checkForm'],
+        opt = { method = 'POST' },
+        data = { sng_ids = map(function (t)
+            return t.id
+        end, table.unpack(tracks))}
+    })
+    debug(dkjson.encode(SNG_NFO,{indent=true}))
+
+    
 end
 
 
@@ -256,37 +275,36 @@ function heading(headers)
     return table.concat(param, ' ')
 end
 
-
-function get(url, headers)
-    headers = headers or ''
-    if type(headers) == 'table' then
-        headers = heading(headers)
-    end
-
-    local command = 'curl -s ' .. headers .. ' "' .. url .. '" '
+function popen(command)
     debug(command)
     local handle = io.popen(command)
     local response = handle:read("*a")
     handle:close()
     return response
-
 end
 
-function post_data(url, headers, data)
+function get(url, headers)
+    
     headers = headers or ''
+    
     if type(headers) == 'table' then
         headers = heading(headers)
     end
 
+    return popen('curl -s ' .. headers .. ' "' .. url .. '" ')
+end
+
+function post(url, headers, data)
+    
+    headers = headers or ''
+    
+    if type(headers) == 'table' then
+        headers = heading(headers)
+    end
     
     data = dkjson.encode(data) or ''
     
-    local command = 'curl -s -X POST ' .. headers .. ' -d "'.. data ..'" "' .. url .. '"'
-
-    local handle = io.popen(command)
-    local response = handle:read("*a")
-    handle:close()
-    return response
+    return popen('curl -s -X POST ' .. headers .. ' -d \''.. data ..'\' "' .. url .. '"')
 end
 
 function try(f, ...)
