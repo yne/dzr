@@ -1,3 +1,6 @@
 {
-    "maven.terminal.customEnv": []
+    "maven.terminal.customEnv": [],
+    "Lua.diagnostics.globals": [
+        "vlc"
+    ]
 }
