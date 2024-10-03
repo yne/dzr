@@ -5,12 +5,12 @@
 -- Mac:     /Applications/VLC/.../lua/extensions/basic.lua
 -- Linux:   ~/.local/share/vlc/lua/extensions/basic.lua
 dkjson = require "dkjson"
-bit32 = require "bit32"
 
 API_DEEZER = "https://api.deezer.com"
 
 title = "Accountless Deezer Player on VLC"
 logout = false
+
 CBC = "g4el58wc0zvf9na1"
 
 default_colspan = 2
@@ -79,7 +79,8 @@ function descriptor()
         author = "PitchHybrid",
         url = 'https://github.com/pitchhybrid/dzr',
         shortdesc = "Deezer player",
-        description = "Accountless Deezer Player on VLC"
+        description = "Accountless Deezer Player on VLC",
+        capabilities = {}
         -- capabilities = {"input-listener", "meta-listener", "playing-listener"}
     }
 end
@@ -163,7 +164,7 @@ function compile_tracks()
             end)
         end
     end
-    play()
+    play(tracks)
 end
 
 function gw(callableTable)
@@ -171,7 +172,7 @@ function gw(callableTable)
     return callableTable()
 end
 
-function play()
+function play(tracks)
     local function _gw(args)
         return dkjson.decode(gw(args)).results
     end
@@ -219,7 +220,7 @@ function play()
 
     local songs = map(function (i, d) 
         return {
-            id = d['id'],
+            id = tostring(d['id']),
             md5_image = SNG_NFO['data'][i]['ALB_PICTURE'],
             duration = SNG_NFO['data'][i]['DURATION'],
             title = SNG_NFO['data'][i]['TITLE'],
@@ -236,17 +237,41 @@ function play()
         }    
     end, table.unpack(tracks))
 
-    local hex = function (str) 
+    local hex = function (s)
         local cs = {}
-        for i in str:gmatch(".") do
-            table.insert(cs, string.byte(i))
+        for c in s:gmatch(".") do
+            table.insert(cs, string.byte(c))
         end
         return cs
     end
-    
-    debug(dkjson.encode(songs,{indent=true}))
 
-    
+    local iv = map(function (i, c)
+        return string.format('%02X',c)
+    end, table.unpack({0,1,2,3,4,5,6,7}))
+
+    local decrypt = map(function (_, song)
+        local md = hex(md5(song['id']))
+
+        local cbc = hex(CBC)
+
+        local key = map(function (i, c)
+            return string.format('%02X', XOR(c, XOR(md[i], md[i + 16])))
+        end, table.unpack(cbc))
+
+        local decrypted_audio = download_and_decrypt( song['id'], song['url'], table.concat(key), table.concat(iv))
+       
+        return  {song = song, decrypted_audio = decrypted_audio}
+
+    end, table.unpack(songs))
+
+    vlc.playlist.add(map( function (i, track)
+        return {
+            path = 'file://' .. track['decrypted_audio'],
+            name = track['song']['title'],
+            artist = track['song']['artists'][1]['name'],
+            arturl = string.format('https://e-cdns-images.dzcdn.net/images/%s/%s/%sx%s.jpg', 'cover', track['song']['md5_image'], 1000,1000) 
+        }    
+    end,table.unpack(decrypt))) 
 end
 
 
@@ -284,12 +309,12 @@ function browse(url)
             if data[i]['nb_tracks'] then
                 table.insert(label, string.format(" (%d)", data[i]['nb_tracks']))
             end
-            table.insert(map_selection, #map_selection + 1, {
+            map_selection[tostring(data[i]['id'])] = {
                 id = data[i]['id'],
                 play_type = play_type,
                 label = table.concat(label, ' '),
                 entry = data[i]
-            })
+            }
         end
         if json.next then
             json_next = json.next
@@ -342,7 +367,7 @@ function fetch(url, callback)
     local stream = vlc.stream(url)
     if stream then
        local response = try(function()
-            return stream:readline()
+            return stream:read(100000)
         end)
         if response then
            callback(response)
@@ -429,7 +454,19 @@ end
 
 -- CRYPT UTILS --
 -- Operações bitwise para Lua 5.1
-local function AND(a, b)
+
+local function safe_number(a)
+    if type(a) ~= "number" then
+        return 0
+    end
+    return a
+end
+
+function AND(a, b)
+    -- Garante que os parâmetros são números válidos
+    a = safe_number(a)
+    b = safe_number(b)
+
     local r = 0
     local m = 1
     for i = 0, 31 do
@@ -443,7 +480,11 @@ local function AND(a, b)
     return r
 end
 
-local function OR(a, b)
+function OR(a, b)
+    -- Garante que os parâmetros são números válidos
+    a = safe_number(a)
+    b = safe_number(b)
+
     local r = 0
     local m = 1
     for i = 0, 31 do
@@ -457,145 +498,87 @@ local function OR(a, b)
     return r
 end
 
-local function XOR(a, b)
-    local r = 0
-    local m = 1
-    for i = 0, 31 do
-        if (a % 2 ~= b % 2) then
-            r = r + m
+function XOR(a, b)
+    local result = 0
+    local bitval = 1
+    while a > 0 or b > 0 do
+        local abit = safe_number(a) % 2
+        local bbit = safe_number(b) % 2
+        if abit ~= bbit then
+            result = result + bitval
         end
-        a = math.floor(a / 2)
-        b = math.floor(b / 2)
-        m = m * 2
+        a = math.floor(safe_number(a) / 2)
+        b = math.floor(safe_number(b) / 2)
+        bitval = bitval * 2
     end
-    return r
+    return result
 end
 
-local function NOT(a)
+function NOT(a)
+    -- Garante que o parâmetro é um número válido
+    a = safe_number(a)
     return 4294967295 - a
 end
 
-local function LEFTSHIFT(a, b)
+function LEFTSHIFT(a, b)
+    -- Garante que os parâmetros são números válidos
+    a = safe_number(a)
+    b = safe_number(b)
+
     return (a * 2^b) % 4294967296
 end
 
-local function RIGHTSHIFT(a, b)
+function RIGHTSHIFT(a, b)
+    -- Garante que os parâmetros são números válidos
+    a = safe_number(a)
+    b = safe_number(b)
+
     return math.floor(a / 2^b)
 end
 
 -- Função para rotacionar bits à esquerda
-local function leftrotate(x, c)
+function leftrotate(x, c)
+    -- Garante que os parâmetros são números válidos
+    x = safe_number(x)
+    c = safe_number(c)
+
     return OR(LEFTSHIFT(x, c), RIGHTSHIFT(x, 32 - c))
 end
 
-local function md5(message)
-    -- Sine parts
-    local k = {}
-    for i = 0, 63 do
-        k[i] = math.floor(2^32 * math.abs(math.sin(i + 1)))
-    end
-
-    -- Initial variables
-    local h0 = 0x67452301
-    local h1 = 0xefcdab89
-    local h2 = 0x98badcfe
-    local h3 = 0x10325476
-
-    -- Pre-processing
-    local original_len_in_bits = #message * 8
-    message = message .. "\128"
-    while (#message * 8) % 512 ~= 448 do
-        message = message .. "\0"
-    end
-    message = message .. string.pack("<I8", original_len_in_bits)
-
-    -- Process the message in successive 512-bit chunks
-    for chunk_start = 1, #message, 64 do
-        local chunk = {string.unpack("<I4I4I4I4I4I4I4I4I4I4I4I4I4I4I4I4", message, chunk_start)}
-
-        local a = h0
-        local b = h1
-        local c = h2
-        local d = h3
-
-        for i = 0, 63 do
-            local f, g
-            if i < 16 then
-                f = OR(AND(b, c), AND(NOT(b), d))
-                g = i
-            elseif i < 32 then
-                f = OR(AND(d, b), AND(NOT(d), c))
-                g = (5 * i + 1) % 16
-            elseif i < 48 then
-                f = XOR(b, c, d)
-                g = (3 * i + 5) % 16
-            else
-                f = XOR(c, OR(b, NOT(d)))
-                g = (7 * i) % 16
-            end
-
-            local temp = d
-            d = c
-            c = b
-            
-            -- Determina a quantidade de rotação a ser aplicada
-            local s
-            if i < 16 then
-                s = {7, 12, 17, 22}
-            elseif i < 32 then
-                s = {5, 9, 14, 20}
-            elseif i < 48 then
-                s = {4, 11, 16, 23}
-            else
-                s = {6, 10, 15, 21}
-            end
-
-            -- Aplica a rotação de acordo com o índice
-            b = b + leftrotate(a + f + k[i] + chunk[g + 1], s[(i % 4) + 1])
-            a = temp
-        end
-
-        h0 = AND(h0 + a, 0xFFFFFFFF)
-        h1 = AND(h1 + b, 0xFFFFFFFF)
-        h2 = AND(h2 + c, 0xFFFFFFFF)
-        h3 = AND(h3 + d, 0xFFFFFFFF)
-    end
-
-    -- Produz o valor hash final (big-endian)
-    return string.format("%08x%08x%08x%08x", h0, h1, h2, h3)
+function md5(message)
+    return popen("echo -n '" .. message .. "' | openssl md5"):match("%= (.+)"):match("^%s*(.-)%s*$")
 end
 
--- Função XOR entre dois blocos de bytes
-local function xor_bytes(block1, block2)
-    local result = {}
-    for i = 1, #block1 do
-        result[i] = string.char(bit.bxor(string.byte(block1, i), string.byte(block2, i)))
+function download_and_decrypt(id, url, key, iv)
+    -- Diretório temporário do VLC (ajustável conforme necessário)
+    local temp_dir = vlc.config.cachedir() .. '/'
+    os.execute("mkdir -p " .. temp_dir)
+    
+    -- Arquivo temporário criptografado e o arquivo de saída descriptografado
+    local encrypted_file = temp_dir .. tostring(id) .. ".enc"
+    local decrypted_file = temp_dir .. tostring(id) .. ".mp3"
+    
+    -- Comando curl para baixar o arquivo criptografado
+    popen("curl -o " .. encrypted_file .. " " .. url)
+
+    -- Comando openssl para descriptografar o arquivo
+    -- key: chave de criptografia fornecida
+    -- iv: vetor de inicialização fornecido, que será {1, 2, 3, 4, 5, 6, 7}
+    -- Aqui estamos assumindo AES-128-CBC
+    local openssl_cmd = string.format(
+        "openssl bf-cbc -iter 1 -d -nopad -bufsize 2048 -K %s -iv %s -provider legacy -in %s -out %s",
+        key, iv, encrypted_file, decrypted_file
+    )
+    
+    -- Executar o comando de descriptografia
+    popen(openssl_cmd)
+
+    -- Verificar se o arquivo descriptografado existe e retornar o caminho
+    local file = io.open(decrypted_file, "r")
+    if file then
+        file:close()
+        return decrypted_file  -- Sucesso, retornar o caminho do arquivo MP3
+    else
+        return nil  -- Falha na descriptografia
     end
-    return table.concat(result)
-end
-
--- CBC decrypt function
-local function cbc_decrypt(ciphertext, key, iv, decrypt_block_func)
-    local block_size = 16 -- bloco de 16 bytes para AES
-    local plaintext = ""
-    local previous_block = iv
-
-    -- Processa cada bloco de ciphertext
-    for i = 1, #ciphertext, block_size do
-        local current_block = ciphertext:sub(i, i + block_size - 1)
-        -- Descriptografa o bloco
-        local decrypted_block = decrypt_block_func(current_block, key)
-        -- XOR com o bloco anterior (ou IV para o primeiro bloco)
-        local xor_result = xor_bytes(decrypted_block, previous_block)
-        -- Adiciona o resultado ao texto plano final
-        plaintext = plaintext .. xor_result
-        -- Atualiza o bloco anterior
-        previous_block = current_block
-    end
-
-    -- Retira o padding do último bloco (PKCS#7)
-    local padding_length = string.byte(plaintext:sub(-1))
-    plaintext = plaintext:sub(1, -padding_length - 1)
-
-    return plaintext
 end

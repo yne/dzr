@@ -17,6 +17,8 @@ track_key=$(for k in 1 3 5 7 9 11 13 15 17 19 21 23 25 27 29 31; do # no seq in 
 	printf '%02x' "$((0x$a ^ 0x$b ^ 0x$c))"
 done)
 
+echo "track key: $track_key"
+
 stripe_size=2048
 openssl_opt="-d -nopad -bufsize $stripe_size -K $track_key -iv 0001020304050607"
 # OpenSSL 3 require som extra argument

@@ -493,7 +493,8 @@ exports.activate = async function (
       dzr.post("open", dzr.state.current);
       const buf_enc = await fetch(dzr.state.current.url);
       for (let pos = 0; pos < buf_enc.length; pos += stripe) {
-        if ((pos >> 11) % 3) continue;
+        if ((pos >> 11) % 3) 
+          continue;
         const ciph = crypto
           .createDecipheriv("bf-cbc", key, iv)
           .setAutoPadding(false);
