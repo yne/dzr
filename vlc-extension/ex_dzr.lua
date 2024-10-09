@@ -72,6 +72,8 @@ GW_META = {
     end
 }
 
+-- VLC DEFAULT FUNCTIONS ----------------
+
 function descriptor()
     return {
         title = title,
@@ -80,8 +82,8 @@ function descriptor()
         url = 'https://github.com/pitchhybrid/dzr',
         shortdesc = "Deezer player",
         description = "Accountless Deezer Player on VLC",
-        capabilities = {}
-        -- capabilities = {"input-listener", "meta-listener", "playing-listener"}
+        capabilities = {"meta-listener"}
+        -- capabilities = {"input-listener", , "playing-listener"}
     }
 end
 
@@ -98,6 +100,31 @@ function activate()
 
     ui['main_window']:show()
 end
+
+function deactivate()
+    -- what should be done on deactivation of extension
+    if ui['main_window'] then
+        ui['main_window']:hide()
+    end
+    if logout then
+        ui['main_window']:deactivate()
+    end
+end
+
+function close()
+    -- function triggered on dialog box close event
+    -- for example to deactivate extension on dialog box close:
+    vlc.deactivate()
+end
+
+function meta_changed()
+    if ui['main_window'] then
+        ui['main_window']:hide()
+    end
+end
+
+
+-- USER FUNCTIONS
 
 function search_api()
 
@@ -119,30 +146,14 @@ function search_api()
     end
     if next(map_selection) then
         ui['main_window']:add_button("Play", compile_tracks, 1, 6, default_colspan, default_rowspan)
-        for i, p in ipairs(map_selection) do
-            ui['list']:add_value(p.label, tostring(p.id))
+        for k, v in ipairs(map_selection) do
+            ui['list']:add_value(v.label, tostring(v.id))
         end
     end
     if json_next then
         ui['search']:set_text("More")
     end
     ui['main_window']:update()
-end
-
-function deactivate()
-    -- what should be done on deactivation of extension
-    if ui['main_window'] then
-        ui['main_window']:hide()
-    end
-    if logout then
-        ui['main_window']:deactivate()
-    end
-end
-
-function close()
-    -- function triggered on dialog box close event
-    -- for example to deactivate extension on dialog box close:
-    vlc.deactivate()
 end
 
 function compile_tracks()
@@ -173,7 +184,17 @@ function gw(callableTable)
 end
 
 function play(tracks)
+    
+    if next(tracks) == nil then
+        return
+    end
+
     local function _gw(args)
+        local r = dkjson.decode(gw(args))
+        if r['error'] and next(r['error']) then
+            debug(dkjson.encode(r))
+            return {}
+        end
         return dkjson.decode(gw(args)).results
     end
     debug("playing .....")
@@ -192,13 +213,24 @@ function play(tracks)
         api_token = USR_NFO['checkForm'],
         opt = { method = 'POST' },
         data = { sng_ids = map(function (i, t)
-            return t.id
-        end, table.unpack(tracks))}
+                return t.id
+            end, unpack(tracks))
+        }
     })
+    
+
+    if SNG_NFO['data'] == nil then
+        return
+    else
+        if next(SNG_NFO['data']) == nil then
+            return
+        end
+    end
+
     local URL_NFO = dkjson.decode(post('https://media.deezer.com/v1/get_url', {}, {
         track_tokens = map(function (i, d)
             return d['TRACK_TOKEN']
-        end, table.unpack(SNG_NFO['data'])),
+        end, unpack(SNG_NFO['data'])),
         license_token = USR_NFO['USER']['OPTIONS']['license_token'],
         media = {
             {
@@ -211,12 +243,14 @@ function play(tracks)
     }))
     
     for i, v in ipairs(URL_NFO['data']) do
-        if v['erros'] then
-            for j, e in ipairs(v['erros']) do
-                debug( tracks[i] .. ' -> ' .. '(' .. e['code'] .. ') ' .. e['message'])
+        if v['errors'] and next(v['errors']) then
+            for j, e in ipairs(v['errors']) do
+                debug(tracks[i] .. ' -> ' .. '(' .. e['code'] .. ') ' .. e['message'])
             end
+            return
         end
     end
+
 
     local songs = map(function (i, d) 
         return {
@@ -230,12 +264,12 @@ function play(tracks)
                     name = a['ART_NAME'],
                     md5 = a['ART_PICTURE']
                 } 
-            end, table.unpack(SNG_NFO['data'][i]['ARTISTS'])),
+            end, unpack(SNG_NFO['data'][i]['ARTISTS'])),
             size = SNG_NFO['data'][i]['FILESIZE'],
             expire = SNG_NFO['data'][i]['TRACK_TOKEN_EXPIRE'],
             url = URL_NFO['data'][i]['media'][1]['sources'][1]['url']
         }    
-    end, table.unpack(tracks))
+    end, unpack(tracks))
 
     local hex = function (s)
         local cs = {}
@@ -247,7 +281,7 @@ function play(tracks)
 
     local iv = map(function (i, c)
         return string.format('%02X',c)
-    end, table.unpack({0,1,2,3,4,5,6,7}))
+    end, unpack({0,1,2,3,4,5,6,7}))
 
     local decrypt = map(function (_, song)
         local md = hex(md5(song['id']))
@@ -256,13 +290,13 @@ function play(tracks)
 
         local key = map(function (i, c)
             return string.format('%02X', XOR(c, XOR(md[i], md[i + 16])))
-        end, table.unpack(cbc))
+        end, unpack(cbc))
 
         local decrypted_audio = download_and_decrypt( song['id'], song['url'], table.concat(key), table.concat(iv))
        
         return  {song = song, decrypted_audio = decrypted_audio}
 
-    end, table.unpack(songs))
+    end, unpack(songs))
 
     vlc.playlist.add(map( function (i, track)
         return {
@@ -271,10 +305,8 @@ function play(tracks)
             artist = track['song']['artists'][1]['name'],
             arturl = string.format('https://e-cdns-images.dzcdn.net/images/%s/%s/%sx%s.jpg', 'cover', track['song']['md5_image'], 1000,1000) 
         }    
-    end,table.unpack(decrypt))) 
+    end,unpack(decrypt))) 
 end
-
-
 
 function select_itens(sel_itens)
     selection = {}
@@ -309,12 +341,12 @@ function browse(url)
             if data[i]['nb_tracks'] then
                 table.insert(label, string.format(" (%d)", data[i]['nb_tracks']))
             end
-            map_selection[tostring(data[i]['id'])] = {
+            table.insert(map_selection, #map_selection + 1, {
                 id = data[i]['id'],
                 play_type = play_type,
                 label = table.concat(label, ' '),
                 entry = data[i]
-            }
+            })
         end
         if json.next then
             json_next = json.next
@@ -327,7 +359,7 @@ function try(f, ...)
     local args = {...}
     local status, output = pcall(function()
         if #args > 0 then
-            return f(table.unpack(args))
+            return f(unpack(args))
         end
         return f()
     end)
@@ -393,8 +425,8 @@ end
 
 function popen(command)
     debug(command)
-    local handle = io.popen(command)
-    local response = handle:read("*a")
+    local handle = io.popen(command, 'r')
+    local response = handle:read("*a*")
     handle:close()
     return response
 end
@@ -407,7 +439,7 @@ function get(url, headers)
         headers = heading(headers)
     end
 
-    return popen('curl -s ' .. headers .. ' "' .. url .. '" ')
+    return popen('curl ' .. headers .. ' "' .. url .. '" ')
 end
 
 function post(url, headers, data)
@@ -420,7 +452,24 @@ function post(url, headers, data)
     
     data = dkjson.encode(data) or ''
     
-    return popen('curl -s -X POST ' .. headers .. ' -d \''.. data ..'\' "' .. url .. '"')
+    return popen('curl -X POST ' .. headers .. ' -d '.. escape_string(data) ..' "' .. url .. '"')
+end
+
+function escape_string(str)
+    -- Substitui caracteres especiais por seus equivalentes escapados
+    local replacements = {
+        ['\\'] = '\\\\', -- Barra invertida
+        ['"'] = '\\"', -- Aspas duplas
+        ["'"] = "\\'", -- Aspas simples
+        ['\n'] = '\\n', -- Quebra de linha
+        ['\t'] = '\\t', -- Tabulação
+        ['\r'] = '\\r', -- Retorno de carro
+        ['\b'] = '\\b', -- Backspace
+        ['\f'] = '\\f' -- Formfeed
+    }
+
+    -- Faz o gsub para substituir todos os caracteres especiais
+    return '"' .. (str:gsub(".", replacements)) .. '"'
 end
 
 function url_encode0(str)
@@ -551,7 +600,8 @@ end
 
 function download_and_decrypt(id, url, key, iv)
     -- Diretório temporário do VLC (ajustável conforme necessário)
-    local temp_dir = vlc.config.cachedir() .. '/'
+    local temp_dir = vlc.config.cachedir() .. get_separator()
+
     os.execute("mkdir -p " .. temp_dir)
     
     -- Arquivo temporário criptografado e o arquivo de saída descriptografado
@@ -569,7 +619,6 @@ function download_and_decrypt(id, url, key, iv)
         "openssl bf-cbc -iter 1 -d -nopad -bufsize 2048 -K %s -iv %s -provider legacy -in %s -out %s",
         key, iv, encrypted_file, decrypted_file
     )
-    
     -- Executar o comando de descriptografia
     popen(openssl_cmd)
 
@@ -582,3 +631,9 @@ function download_and_decrypt(id, url, key, iv)
         return nil  -- Falha na descriptografia
     end
 end
+
+function get_separator()
+    -- O primeiro caractere de package.config é o separador de diretórios
+    return package.config:sub(1, 1)
+end
+
