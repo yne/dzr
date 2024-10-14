@@ -37,8 +37,6 @@ search_list = {
 map_selection = {}
 selection = {}
 
-tracks = {};
-
 play_type = nil
 
 ui = {}
@@ -158,10 +156,12 @@ end
 
 function compile_tracks()
     select_itens(ui['list']:get_selection())
+    local tracks = {}
     for i, v in ipairs(selection) do
-        if v.play_type == "Track" then
+        if play_type == "Track" then
             table.insert(tracks, #tracks + 1, v['entry'])
         else
+
             local tracklist = v['entry']['tracklist']
             if v['entry']['nb_tracks'] then
                 tracklist = tracklist .. "&limit=" .. v['entry']['nb_tracks']
@@ -186,6 +186,7 @@ end
 function play(tracks)
     
     if next(tracks) == nil then
+        debug("no tracks")
         return
     end
 
@@ -220,9 +221,11 @@ function play(tracks)
     
 
     if SNG_NFO['data'] == nil then
+        debug("no data")
         return
     else
         if next(SNG_NFO['data']) == nil then
+            debug("no data")
             return
         end
     end
@@ -601,8 +604,8 @@ end
 function download_and_decrypt(id, url, key, iv)
     -- Diretório temporário do VLC (ajustável conforme necessário)
     local temp_dir = vlc.config.cachedir() .. get_separator()
-
-    os.execute("mkdir -p " .. temp_dir)
+    
+    os.execute("mkdir " .. temp_dir)
     
     -- Arquivo temporário criptografado e o arquivo de saída descriptografado
     local encrypted_file = temp_dir .. tostring(id) .. ".enc"
