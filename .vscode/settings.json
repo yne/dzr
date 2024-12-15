@@ -2,5 +2,6 @@
     "maven.terminal.customEnv": [],
     "Lua.diagnostics.globals": [
         "vlc"
-    ]
+    ],
+    "cmake.sourceDirectory": "/home/pitchhybrid/Documents/Projects/js/dzr/player-c"
 }

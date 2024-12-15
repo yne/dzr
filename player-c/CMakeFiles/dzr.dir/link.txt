@@ -1,0 +1,1 @@
+/usr/bin/cc -Wl,--dependency-file=CMakeFiles/dzr.dir/link.d CMakeFiles/dzr.dir/dzr.c.o -o dzr  -lcurl
