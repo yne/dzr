@@ -1,8 +1,0 @@
-[
-{
-  "directory": "/home/pitchhybrid/Documents/Projects/js/dzr/build",
-  "command": "/usr/bin/gcc -g -o CMakeFiles/dzr.dir/dzr.c.o -c /home/pitchhybrid/Documents/Projects/js/dzr/player-c/dzr.c",
-  "file": "/home/pitchhybrid/Documents/Projects/js/dzr/player-c/dzr.c",
-  "output": "CMakeFiles/dzr.dir/dzr.c.o"
-}
-]

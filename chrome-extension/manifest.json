@@ -11,8 +11,11 @@
         "storage",
         "tabs",
         "activeTab",
-        "scripting"
+        "scripting",
+        "cookies"
     ],
+    "optional_permissions":[],
+    "optional_host_permissions": [],
     "background": {
         "service_worker": "service.js"
     },

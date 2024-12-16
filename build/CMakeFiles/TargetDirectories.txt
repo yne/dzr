@@ -1,3 +1,0 @@
-/home/pitchhybrid/Documents/Projects/js/dzr/build/CMakeFiles/dzr.dir
-/home/pitchhybrid/Documents/Projects/js/dzr/build/CMakeFiles/edit_cache.dir
-/home/pitchhybrid/Documents/Projects/js/dzr/build/CMakeFiles/rebuild_cache.dir
