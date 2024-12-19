@@ -1,1 +1,3 @@
 *.luac
+/build
+/.vscode
