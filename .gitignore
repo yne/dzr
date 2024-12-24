@@ -1,3 +1,5 @@
 *.luac
 /notepad-plus-plus/build
 /.vscode
+/build
+/player-c/build

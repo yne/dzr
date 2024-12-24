@@ -1,36 +1,44 @@
-# Variáveis
+# Definições do compilador e flags
+CC = gcc
 CXX = g++
-CXXFLAGS = -Wall -Wextra -std=c++17 -Iinclude
+CFLAGS = -Wall
+CXXFLAGS = -Wall -std=c++11
+
+# Flags adicionais para o linker
+LDFLAGS = -lncursesw  # Adiciona a biblioteca pdcurses ao processo de linkagem
+
+# Nome do arquivo de saída (EXE para Windows)
+TARGET = dzr.exe
+
+# Diretórios
 SRC_DIR = src
+OBJ_DIR = obj
 BUILD_DIR = build
-OBJ_DIR = $(BUILD_DIR)/obj
-BIN_DIR = $(BUILD_DIR)/bin
 
-# Nome do executável
-TARGET = $(BIN_DIR)/player-c
+# Coleta todos os arquivos fonte no diretório SRC_DIR
+SRCS = $(wildcard $(SRC_DIR)/*.cpp)  # Busca todos os arquivos .cpp no diretório src
+OBJS = $(SRCS:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)  # Substitui o diretório src por obj e a extensão .cpp por .o
 
-# Lista de arquivos fonte
-SRCS = $(wildcard $(SRC_DIR)/**/*.cpp $(SRC_DIR)/*.cpp)
+# Regra para compilar tudo
+default: $(BUILD_DIR)/$(TARGET)
+	@echo "Iniciando o processo de build..."  # Log para indicar início do build
 
-# Lista de arquivos objeto gerados
-OBJS = $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(SRCS))
+# Cria o arquivo EXE a partir dos objetos
+$(BUILD_DIR)/$(TARGET): $(OBJS)
+	@echo "Linkando objetos para criar o executável final..."  # Log para depuração
+	@mkdir -p $(BUILD_DIR)  # Garante que o diretório de build existe
+	$(CXX) $(CXXFLAGS) $(OBJS) -o $@ $(LDFLAGS)  # Comando para linkar os objetos com as flags de linkagem
+	@echo "Build concluído: $(BUILD_DIR)/$(TARGET)"  # Log de conclusão do build
 
-# Regra principal
-all: $(TARGET)
-
-# Regra para compilar o executável final
-$(TARGET): $(OBJS)
-	@mkdir -p $(BIN_DIR)
-	$(CXX) $(CXXFLAGS) -o $@ $^
-
-# Regra para compilar arquivos objeto
+# Regra para compilar os arquivos .cpp em .o
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	@echo "Compilando $< ..."  # Log para indicar qual arquivo está sendo compilado
+	@mkdir -p $(OBJ_DIR)  # Garante que o diretório de objetos existe
+	$(CXX) $(CXXFLAGS) -c $< -o $@  # Comando para compilar o arquivo fonte
+	@echo "Arquivo objeto gerado: $@"  # Log para confirmar geração do objeto
 
-# Limpeza dos arquivos gerados
+# Limpa os arquivos gerados
 clean:
-	rm -rf $(BUILD_DIR)
-
-# Phony targets (para evitar conflitos com arquivos de mesmo nome)
-.PHONY: all clean
+	@echo "Limpando arquivos gerados..."  # Log para indicar limpeza
+	rm -rf $(OBJ_DIR) $(BUILD_DIR)/$(TARGET)
+	@echo "Limpeza concluída."  # Log para confirmar conclusão da limpeza
