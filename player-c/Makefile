@@ -42,3 +42,6 @@ clean:
 	@echo "Limpando arquivos gerados..."  # Log para indicar limpeza
 	rm -rf $(OBJ_DIR) $(BUILD_DIR)/$(TARGET)
 	@echo "Limpeza concluída."  # Log para confirmar conclusão da limpeza
+
+run:
+	./$(BUILD_DIR)/$(TARGET)
