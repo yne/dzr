@@ -16,7 +16,7 @@ OBJ_DIR = obj
 BUILD_DIR = build
 
 # Coleta todos os arquivos fonte no diretório SRC_DIR
-SRCS = $(wildcard $(SRC_DIR)/*.cpp)  # Busca todos os arquivos .cpp no diretório src
+SRCS = $(wildcard $(SRC_DIR)/*.c)  # Busca todos os arquivos .cpp no diretório src
 OBJS = $(SRCS:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)  # Substitui o diretório src por obj e a extensão .cpp por .o
 
 # Regra para compilar tudo
@@ -27,14 +27,14 @@ default: $(BUILD_DIR)/$(TARGET)
 $(BUILD_DIR)/$(TARGET): $(OBJS)
 	@echo "Linkando objetos para criar o executável final..."  # Log para depuração
 	@mkdir -p $(BUILD_DIR)  # Garante que o diretório de build existe
-	$(CXX) $(CXXFLAGS) $(OBJS) -o $@ $(LDFLAGS)  # Comando para linkar os objetos com as flags de linkagem
+	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)  # Comando para linkar os objetos com as flags de linkagem
 	@echo "Build concluído: $(BUILD_DIR)/$(TARGET)"  # Log de conclusão do build
 
 # Regra para compilar os arquivos .cpp em .o
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@echo "Compilando $< ..."  # Log para indicar qual arquivo está sendo compilado
 	@mkdir -p $(OBJ_DIR)  # Garante que o diretório de objetos existe
-	$(CXX) $(CXXFLAGS) -c $< -o $@  # Comando para compilar o arquivo fonte
+	$(CC) $(CFLAGS) -c $< -o $@  # Comando para compilar o arquivo fonte
 	@echo "Arquivo objeto gerado: $@"  # Log para confirmar geração do objeto
 
 # Limpa os arquivos gerados
