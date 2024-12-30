@@ -22,6 +22,8 @@
 
 #define CHECK_WINDOW(x) if(!(x)) { endwin(); exit(1); }
 
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
+
 static inline WINDOW *create_win(int y, int x, int starty, int startx) {
     WINDOW *win = newwin(y, x, starty, startx);
     box(win, 0, 0);
@@ -57,9 +59,18 @@ void logging(char *str) {
 }
 
 int main(int argc, char **argv) {
+
+    ITEM **items;
     // init screen and sets up screen
     INIT_CURSES();
+    
+    int nchoices = sizeof("abcd") * 10;
 
+    items = calloc(nchoices, sizeof(ITEM *));
+
+    for (int i = 0; i < 10; i++) {
+        items[i] = new_item("abcd", "abcd");
+    }
 
     int yMax,xMax;
     getmaxyx(stdscr, yMax, xMax);
@@ -80,12 +91,15 @@ int main(int argc, char **argv) {
     addLabel(searchMenu, "Painel");
     
     addLabel(searchInput, "Search (track[t]/artist[a]/album[b]/playlist[p]/user[u]/radio[r])");
-
-    int ch;
     
     MENU *menu;
-    CHECK_WINDOW(menu = new_menu((ITEM **)NULL));
 
+    CHECK_WINDOW(menu = new_menu((ITEM **) items));
+    
+    set_menu_win(menu, playlist);
+    set_menu_sub(menu, derwin(playlist, 3, getmaxx(playlist) - 2, 1, xDiv + 1));
+
+    int ch;
     while ((ch = getch()) != CTRL_D){
         if(ch == ':'){
             ch = getch();
