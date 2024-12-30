@@ -5,7 +5,7 @@ CFLAGS = -Wall
 CXXFLAGS = -Wall -std=c++11
 
 # Flags adicionais para o linker
-LDFLAGS = -lncursesw  # Adiciona a biblioteca pdcurses ao processo de linkagem
+LDFLAGS = -lncursesw -lmenuw # Adiciona a biblioteca pdcurses ao processo de linkagem
 
 # Nome do arquivo de saída (EXE para Windows)
 TARGET = dzr.exe
