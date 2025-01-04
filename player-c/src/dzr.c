@@ -6,10 +6,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef __linux__
+#include <ncurses.h>
+#include <form.h>
+#include <menu.h>
+#include <panel.h>
+#else
 #include <ncurses/curses.h>
 #include <ncurses/form.h>
 #include <ncurses/menu.h>
 #include <ncurses/panel.h>
+#endif
 
 
 #define EXIT 17
@@ -18,9 +25,9 @@
 
 #define NCURSES_TRACE 1
 
-#define INIT_CURSES() initscr();  noecho();  raw();
+#define INIT_CURSES() do{ initscr();  noecho();  raw(); } while(0);
 
-#define CHECK_WINDOW(x) if(!(x)) { endwin(); exit(1); }
+#define CHECK_WINDOW(x) do {if(!(x)) { endwin(); exit(1); } } while(0);
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
@@ -102,16 +109,34 @@ int main(int argc, char **argv) {
     int ch;
     while ((ch = getch()) != CTRL_D){
         if(ch == ':'){
+            logging("command");
             ch = getch();
-            switch(ch) {
-                case 't': logging("track"); break;
-                case 'a': logging("artist"); break;
-                case 'b': logging("album"); break;
-                case 'p': logging("playlist"); break;
-                case 'u': logging("user"); break;
-                case 'r': logging("radio"); break;
-                default: break;
-            }   
+            switch (ch) {
+              case 't':
+                logging("track");
+                char *track;
+                getstr(track);
+                logging(track);
+                free(track);
+                break;
+              case 'a':
+                logging("artist");
+                break;
+              case 'b':
+                logging("album");
+                break;
+              case 'p':
+                logging("playlist");
+                break;
+              case 'u':
+                logging("user");
+                break;
+              case 'r':
+                logging("radio");
+                break;
+              default:
+                break;
+            }
         }
     }
 
