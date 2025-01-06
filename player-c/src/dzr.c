@@ -25,45 +25,21 @@
 
 #define NCURSES_TRACE 1
 
-#define INIT_CURSES() do{ initscr();  noecho();  raw(); } while(0);
+#define INIT_CURSES() do { initscr();  noecho();  raw(); } while(0);
 
 #define CHECK_WINDOW(x) do {if(!(x)) { endwin(); exit(1); } } while(0);
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
-static inline WINDOW *create_win(int y, int x, int starty, int startx) {
-    WINDOW *win = newwin(y, x, starty, startx);
-    box(win, 0, 0);
-    refresh();
-    wrefresh(win);
-    return win;
-}
+WINDOW *create_win(char * label, int y, int x, int starty, int startx);
+WINDOW *create_subwin(WINDOW *parent, char *label, int y, int x, int starty, int startx);
 
-static inline WINDOW *create_subwin(WINDOW *parent, int y, int x, int starty, int startx) {
-    WINDOW *win = subwin(parent, y, x, starty, startx);
-    box(win, 0, 0);
-    refresh();
-    wrefresh(win);
-    return win;
-}
+void addLabel(WINDOW *win, char *str);
+void logging(char *str);
 
 WINDOW *logWin;
 
-void addLabel(WINDOW *win, char *str) {
-    char *nstr = malloc(sizeof(char) * (strlen(str) + 2));
-    sprintf(nstr, "| %s |", str); 
-    mvwaddstr(win, 0, 1, nstr);
-    wrefresh(win);
-    free(nstr);
-}
 
-void logging(char *str) { 
-    wclear(logWin);
-    box(logWin, 0, 0);
-    addLabel(logWin, "Logging");
-    mvwaddstr(logWin, 1, 3, str);
-    wrefresh(logWin);
-}
 
 int main(int argc, char **argv) {
 
@@ -78,27 +54,25 @@ int main(int argc, char **argv) {
     for (int i = 0; i < 10; i++) {
         items[i] = new_item("abcd", "abcd");
     }
-
+    
     int yMax,xMax;
     getmaxyx(stdscr, yMax, xMax);
 
     int xDiv = xMax / 4;
     int yDiv = yMax - 3;
-    CHECK_WINDOW(logWin = create_win(yMax - yDiv, xMax - xDiv, yDiv, xDiv));
+    CHECK_WINDOW(logWin = create_win("Logging",yMax - yDiv, xMax - xDiv, yDiv, xDiv));
     logging("");
 
     WINDOW *playlist;
-    CHECK_WINDOW(playlist = create_win(yMax, xDiv, 0, 0));
+    CHECK_WINDOW(playlist = create_win("Playlist",yMax, xDiv, 0, 0));
     WINDOW *searchMenu;
-    CHECK_WINDOW(searchMenu = create_win(yDiv, xMax - xDiv, 0, xDiv));
+    CHECK_WINDOW(searchMenu = create_win("Painel" ,yDiv, xMax - xDiv, 0, xDiv));
     WINDOW *searchInput;
-    CHECK_WINDOW(searchInput = create_subwin(searchMenu, 3, getmaxx(searchMenu) - 2, 1, xDiv + 1));
-
-    addLabel(playlist, "Playlist");
-    addLabel(searchMenu, "Painel");
-    
-    addLabel(searchInput, "Search (track[t]/artist[a]/album[b]/playlist[p]/user[u]/radio[r])");
-    
+    CHECK_WINDOW(
+        searchInput = create_subwin(
+            searchMenu,
+            "Search (track[t]/artist[a]/album[b]/playlist[p]/user[u]/radio[r])",
+            3, getmaxx(searchMenu) - 2, 1, xDiv + 1));
     MENU *menu;
 
     CHECK_WINDOW(menu = new_menu((ITEM **) items));
@@ -108,16 +82,26 @@ int main(int argc, char **argv) {
 
     int ch;
     while ((ch = getch()) != CTRL_D){
+        switch (ch) {
+          case KEY_DOWN:
+            menu_driver(menu, REQ_DOWN_ITEM);
+            break;
+          case KEY_UP:
+            menu_driver(menu, REQ_UP_ITEM);
+            break;
+          default:
+            break;
+        }
         if(ch == ':'){
             logging("command");
             ch = getch();
             switch (ch) {
               case 't':
                 logging("track");
-                char *track;
+                char track[100];
                 getstr(track);
                 logging(track);
-                free(track);
+                // free(track);
                 break;
               case 'a':
                 logging("artist");
@@ -135,6 +119,7 @@ int main(int argc, char **argv) {
                 logging("radio");
                 break;
               default:
+                logging("invalid");
                 break;
             }
         }
@@ -148,6 +133,40 @@ int main(int argc, char **argv) {
     endwin();
     exit(0);
     return 0;
+}
+
+WINDOW *create_win(char * label ,int y, int x, int starty, int startx) {
+    WINDOW *win = newwin(y, x, starty, startx);
+    box(win, 0, 0);
+    addLabel(win, label);
+    refresh();
+    wrefresh(win);
+    return win;
+}
+
+WINDOW *create_subwin(WINDOW *parent, char * label, int y, int x, int starty, int startx) {
+    WINDOW *win = subwin(parent, y, x, starty, startx);
+    box(win, 0, 0);
+    addLabel(win, label);
+    refresh();
+    wrefresh(win);
+    return win;
+}
+
+void addLabel(WINDOW *win, char *str) {
+    char *nstr = malloc(sizeof(char) * (strlen(str) + 2));
+    sprintf(nstr, "| %s |", str);
+    mvwaddstr(win, 0, 1, nstr);
+    wrefresh(win);
+    free(nstr);
+}
+
+void logging(char *str) {
+    wclear(logWin);
+    box(logWin, 0, 0);
+    addLabel(logWin, "Logging");
+    mvwaddstr(logWin, 1, 3, str);
+    wrefresh(logWin);
 }
 
 #endif // DZR_H
