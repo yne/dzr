@@ -1,7 +1,8 @@
 # Definições do compilador e flags
 CC = gcc
 CXX = g++
-CFLAGS = -Wall
+GDB = gdb
+CFLAGS = -Wall -Wextra -pedantic
 CXXFLAGS = -Wall -std=c++11
 
 # Flags adicionais para o linker
@@ -45,3 +46,7 @@ clean:
 
 run:
 	./$(BUILD_DIR)/$(TARGET)
+
+debug:
+	$(GDB) -w $(BUILD_DIR)/$(TARGET)
+
