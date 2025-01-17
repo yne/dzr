@@ -6,131 +6,119 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef __linux__
-#include <form.h>
-#include <menu.h>
-#include <ncurses.h>
-#include <panel.h>
-#else
-#include <ncurses/curses.h>
-#include <ncurses/form.h>
-#include <ncurses/menu.h>
-#include <ncurses/panel.h>
-#endif
+struct window_t {
+    WINDOW *window;
+    window_t *subwindow;
+    int y;
+    int x;
+    int starty;
+    int startx;
+    char *label;
+};
 
-#define DEBUG
-
-#ifdef DEBUG
-#define LOG(fmt, ...) fprintf(stderr, "DEBUG: " fmt "\n", ##__VA_ARGS__)
-#else
-#define LOG(fmt, ...)
-#endif
-
-#define EXIT 17
-
-#define CTRL_D 4
-
-#define NCURSES_TRACE 1
-
-#define INIT_CURSES()                                                          \
-    do {                                                                       \
-        initscr();                                                             \
-        noecho();                                                              \
-        raw();                                                                 \
-        keypad(stdscr, TRUE);                                                  \
-    } while (0);
-
-#define CHECK_WINDOW(x)                                                        \
-    do {                                                                       \
-        if (!(x)) {                                                            \
-            endwin();                                                          \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0);
-
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
-
-WINDOW *create_win(char *label, int y, int x, int starty, int startx);
-WINDOW *create_subwin(WINDOW *parent, char *label, int y, int x, int starty,
-                      int startx);
+void create_win(window_t *w);
 
 void addLabel(WINDOW *win, char *str);
 void logging(char *str, ...);
 
-WINDOW *logWin;
-
-int main(int argc, char **argv) {
+int main(void) { // int argc, char **argv
 
     // init screen and sets up screen
     INIT_CURSES();
 
-    // get screen size
-    int yMax, xMax;
-    getmaxyx(stdscr, yMax, xMax);
+    window_t *playlist_w = calloc(1, sizeof(window_t));
+    playlist_w->label = "Playlist";
+    playlist_w->y = layout->yMax;
+    playlist_w->x = layout->xDiv;
+    playlist_w->starty = 0;
+    playlist_w->startx = 0;
+    playlist_w->subwindow = NULL;
 
-    int xDiv = xMax / 4;
-    int yDiv = yMax - 3;
+    window_t *painel_w = calloc(1, sizeof(window_t));
+    painel_w->label = "Painel";
+    painel_w->y = layout->yDiv;
+    painel_w->x = layout->xMax - layout->xDiv;
+    painel_w->starty = 0;
+    painel_w->startx = layout->xDiv;
 
-    // create windows
-    CHECK_WINDOW(
-        logWin = create_win("Logging", yMax - yDiv, xMax - xDiv, yDiv, xDiv));
-    logging("");
+    painel_w->subwindow = calloc(1, sizeof(window_t));
+    painel_w->subwindow->label = "Search (track[t]/artist[a]/album[b]/playlist[p]/user[u]/radio[r])";
+    painel_w->subwindow->y = 3;
+    painel_w->subwindow->x = getmaxx(painel_w->window) - 2;
+    painel_w->subwindow->starty = 1;
+    painel_w->subwindow->startx = layout->xDiv + 1;
 
-    WINDOW *playlist;
-    CHECK_WINDOW(playlist = create_win("Playlist", yMax, xDiv, 0, 0));
-    WINDOW *searchMenu;
-    CHECK_WINDOW(searchMenu = create_win("Painel", yDiv, xMax - xDiv, 0, xDiv));
-    WINDOW *searchInput;
-    CHECK_WINDOW(
-        searchInput = create_subwin(
-            searchMenu,
-            "Search (track[t]/artist[a]/album[b]/playlist[p]/user[u]/radio[r])",
-            3, getmaxx(searchMenu) - 2, 1, xDiv + 1));
+    create_win(playlist_w);
+    
+    create_win(painel_w);
+
 
     // create menus
-    int nchoices = 10;
+    int nchoices = getmaxy(playlist_w->window) - 5;
     ITEM **items = NULL;
 
     for (int i = 0; i < nchoices; i++) {
         items = (ITEM **)realloc(items, sizeof(ITEM *) * (i + 1));
-        items[i] = new_item("abcd", "abcd");
+        char *str = malloc(sizeof(char) * 20);
+        sprintf(str, "%d item", i);
+        items[i] = new_item(str, "abcd");
     }
     items = (ITEM **)realloc(items, sizeof(ITEM *) * (nchoices + 1));
     items[nchoices] = NULL;
 
     MENU *menu = new_menu((ITEM **)items);
 
-    set_menu_win(menu, playlist);
-    set_menu_sub(menu, subwin(playlist, getmaxy(playlist) - 1,
-                              getmaxx(playlist) - 1, 1, 1));
-    set_menu_format(menu, 8, 1);
+    set_menu_win(menu, playlist_w->window);
+    set_menu_sub(menu, subwin(playlist_w->window, getmaxy(playlist_w->window) - 1,
+                              getmaxx(playlist_w->window) - 1, 1, 1));
+    set_menu_format(menu, nchoices, 0);
     set_menu_mark(menu, " * ");
+    menu_opts_off(menu, O_ONEVALUE);
 
     post_menu(menu);
     // refresh();
-    wrefresh(playlist);
+    wrefresh(playlist_w->window);
 
     int ch;
     while ((ch = getch()) != CTRL_D) {
         logging("ch: %d %c", ch, ch);
         switch (ch) {
-        case KEY_DOWN:
+        case KEY_DOWN: {
             logging("down");
             menu_driver(menu, REQ_DOWN_ITEM);
             refresh();
-            wrefresh(playlist);
-
+            wrefresh(playlist_w->window);
             break;
-        case KEY_UP:
+        }
+        case KEY_UP: {
             logging("up");
             menu_driver(menu, REQ_UP_ITEM);
             refresh();
-            wrefresh(playlist);
-            break;
-        default:
+            wrefresh(playlist_w->window);
             break;
         }
-        if (ch == ':') {
+        case KEY_LEFT: {
+            logging("left");
+            break;
+        }
+        case KEY_RIGHT: {
+            logging("right");
+            break;
+        }
+        case ' ': {
+            logging("backspace");
+            ITEM *it = current_item(menu);
+            int index = item_index(it);
+            logging("selecting item %d", index);
+            menu_driver(menu, REQ_TOGGLE_ITEM);
+
+            break;
+        }
+        case KEY_F(1): {
+            logging("f1");
+            break;
+        }
+        case ':': {
             logging("command");
             ch = getch();
             switch (ch) {
@@ -160,38 +148,56 @@ int main(int argc, char **argv) {
                 logging("invalid");
                 break;
             }
+            break;
+        }
+        default:
+            break;
         }
     }
 
     logging("exiting ...");
+    unpost_menu(menu);
+    free_menu(menu);
 
-    delwin(playlist);
-    delwin(searchMenu);
-    delwin(logWin);
-    delwin(searchInput);
+    FREE_ITEMS(items, nchoices + 1);
 
+    delwin(playlist_w->window);
+    delwin(painel_w->subwindow->window);
+    delwin(painel_w->window);
+
+    free(painel_w->subwindow->label);
+    free(painel_w->subwindow);
+    free(painel_w);
+
+    free(playlist_w->label);
+    free(playlist_w->window);
+    free(playlist_w);
+
+
+    logging(NULL);
     endwin();
     exit(0);
     return 0;
 }
 
-WINDOW *create_win(char *label, int y, int x, int starty, int startx) {
-    WINDOW *win = newwin(y, x, starty, startx);
-    box(win, 0, 0);
-    addLabel(win, label);
-    refresh();
-    wrefresh(win);
-    return win;
-}
 
-WINDOW *create_subwin(WINDOW *parent, char *label, int y, int x, int starty,
-                      int startx) {
-    WINDOW *win = subwin(parent, y, x, starty, startx);
-    box(win, 0, 0);
-    addLabel(win, label);
+void create_win(window_t *w) {
+    w->window = newwin(w->y, w->x, w->starty, w->startx);
+    CHECK_WINDOW(w->window);
+    box(w->window, 0, 0);
+    addLabel(w->window, w->label);
     refresh();
-    wrefresh(win);
-    return win;
+    wrefresh(w->window);
+    if (w->subwindow != NULL) {
+        window_t *subw = w->subwindow;
+        subw->window = subwin(w->window, subw->y, subw->x, subw->starty, subw->startx);
+        printf("subw: %p\n", (void *) subw->window);
+        CHECK_WINDOW(subw->window);
+        box(subw->window, 0, 0);
+        addLabel(subw->window, subw->label);
+        refresh();
+        wrefresh(subw->window);
+    }
 }
 
 void addLabel(WINDOW *win, char *str) {
@@ -201,18 +207,43 @@ void addLabel(WINDOW *win, char *str) {
     wrefresh(win);
     free(nstr);
 }
+
 void logging(char *str, ...) {
+   
+    static window_t *logging;
+
+    if(logging == NULL) {
+        logging = calloc(1, sizeof(window_t));
+        logging->label = "Logging";
+        logging->y = layout->yMax - layout->yDiv;
+        logging->x = layout->xMax - layout->xDiv;
+        logging->starty = layout->yDiv;
+        logging->startx = layout->xDiv;
+    }
+
+    if (str == NULL) {
+        if (logging->window != NULL) {
+            delwin(logging->window);
+            LOG("Destroyed logging window");
+        }
+        return;
+    } else {
+        if (logging->window == NULL) {
+            create_win(logging);
+            LOG("Created logging window");
+        }
+    }
     va_list args;
     va_start(args, str);
 
-    wclear(logWin);
-    box(logWin, 0, 0);
-    addLabel(logWin, "Logging");
+    wclear(logging->window);
+    box(logging->window, 0, 0);
+    addLabel(logging->window, "Logging");
 
     char buffer[256];
     vsnprintf(buffer, sizeof(buffer), str, args);
-    mvwaddstr(logWin, 1, 3, buffer);
-    wrefresh(logWin);
+    mvwaddstr(logging->window, 1, 3, buffer);
+    wrefresh(logging->window);
 
     LOG("%s", buffer);
 

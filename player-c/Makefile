@@ -2,7 +2,7 @@
 CC = gcc
 CXX = g++
 GDB = gdb
-CFLAGS = -Wall -Wextra -pedantic
+CFLAGS = -Wall -Wextra -pedantic -Werror -Wpedantic
 CXXFLAGS = -Wall -std=c++11
 
 # Flags adicionais para o linker
@@ -44,7 +44,8 @@ clean:
 	rm -rf $(OBJ_DIR) $(BUILD_DIR)/$(TARGET)
 	@echo "Limpeza concluída."  # Log para confirmar conclusão da limpeza
 
-run:
+run: $(BUILD_DIR)/$(TARGET)
+	@echo "Executando o programa..."
 	./$(BUILD_DIR)/$(TARGET)
 
 debug:
