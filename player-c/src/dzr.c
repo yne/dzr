@@ -19,6 +19,7 @@ struct window_t {
 void create_win(window_t *w);
 
 void addLabel(WINDOW *win, char *str);
+void free_window(window_t *w);
 void logging(char *str, ...);
 
 int main(void) { // int argc, char **argv
@@ -161,18 +162,8 @@ int main(void) { // int argc, char **argv
 
     FREE_ITEMS(items, nchoices + 1);
 
-    delwin(playlist_w->window);
-    delwin(painel_w->subwindow->window);
-    delwin(painel_w->window);
-
-    free(painel_w->subwindow->label);
-    free(painel_w->subwindow);
-    free(painel_w);
-
-    free(playlist_w->label);
-    free(playlist_w->window);
-    free(playlist_w);
-
+    free_window(playlist_w);
+    free_window(painel_w);
 
     logging(NULL);
     endwin();
@@ -248,6 +239,17 @@ void logging(char *str, ...) {
     LOG("%s", buffer);
 
     va_end(args);
+}
+
+void free_window(window_t *w) {
+    if(w->subwindow != NULL) {
+        free_window(w->subwindow);
+    }
+    if (w->window != NULL) {
+        delwin(w->window);
+        free(w->label);
+        free(w);
+    }
 }
 
 #endif // DZR_H
