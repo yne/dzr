@@ -165,6 +165,7 @@ int main(void) { // int argc, char **argv
     free_window(playlist_w);
     free_window(painel_w);
 
+
     logging(NULL);
     endwin();
     exit(0);
@@ -180,8 +181,8 @@ void create_win(window_t *w) {
     refresh();
     wrefresh(w->window);
     if (w->subwindow != NULL) {
-        window_t *subw = w->subwindow;
-        subw->window = subwin(w->window, subw->y, subw->x, subw->starty, subw->startx);
+        window_t *subw = &w->subwindow;
+        subw->window = derwin(w->window, subw->y, subw->x, subw->starty, subw->startx);
         printf("subw: %p\n", (void *) subw->window);
         CHECK_WINDOW(subw->window);
         box(subw->window, 0, 0);
@@ -242,13 +243,13 @@ void logging(char *str, ...) {
 }
 
 void free_window(window_t *w) {
-    if(w->subwindow != NULL) {
-        free_window(w->subwindow);
-    }
     if (w->window != NULL) {
         delwin(w->window);
         free(w->label);
         free(w);
+    }
+    if(w->subwindow != NULL) {
+        free_window(w->subwindow);
     }
 }
 

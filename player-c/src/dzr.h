@@ -14,7 +14,11 @@
 #define DEBUG
 
 #ifdef DEBUG
-#define LOG(fmt, ...) fprintf(stderr, "DEBUG: " fmt "\n", ##__VA_ARGS__)
+#define LOG(fmt, ...) \
+    do { \
+        fprintf(stderr, "DEBUG: " fmt "\n", ##__VA_ARGS__); \
+        fflush(stderr); \
+    } while (0)
 #else
 #define LOG(fmt, ...)
 #endif
