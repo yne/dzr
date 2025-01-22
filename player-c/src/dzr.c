@@ -17,6 +17,9 @@ struct window_t {
 
 void create_win(window_t *w);
 
+MENU *create_menu(window_t *w, ITEM **items, Menu_Options options);
+
+void destroy_menu(MENU *menu, ITEM **items);
 
 void addLabel(WINDOW *win, char *str);
 void free_window(window_t *w);
@@ -48,7 +51,7 @@ int main(void) { // int argc, char **argv
     create_win(painel_w);
 
     // create menus
-    int nchoices = getmaxy(playlist_w->window) - 5;
+    int nchoices = getmaxy(painel_w->window) - 3;
     ITEM **items = NULL;
 
     for (int i = 0; i < nchoices; i++) {
@@ -60,34 +63,26 @@ int main(void) { // int argc, char **argv
     items = (ITEM **)realloc(items, sizeof(ITEM *) * (nchoices + 1));
     items[nchoices] = NULL;
 
-    MENU *menu = new_menu((ITEM **)items);
+    MENU *menu = create_menu(painel_w, items, O_SELECTABLE);   
 
-    set_menu_win(menu, playlist_w->window);
-    set_menu_sub(menu, subwin(playlist_w->window, getmaxy(playlist_w->window) - 1, getmaxx(playlist_w->window) - 1, 1, 1));
-    set_menu_format(menu, nchoices, 0);
-    set_menu_mark(menu, " * ");
-    menu_opts_off(menu, O_ONEVALUE);
-
-    post_menu(menu);
     // refresh();
-    wrefresh(playlist_w->window);
 
     int ch;
     while ((ch = getch()) != CTRL_D) {
-        logging("ch: %d %c", ch, ch);
+        logging("key: %d char: %c", ch, ch);
         switch (ch) {
         case KEY_DOWN: {
             logging("down");
             menu_driver(menu, REQ_DOWN_ITEM);
             refresh();
-            wrefresh(playlist_w->window);
+            wrefresh(painel_w->window);
             break;
         }
         case KEY_UP: {
             logging("up");
             menu_driver(menu, REQ_UP_ITEM);
             refresh();
-            wrefresh(playlist_w->window);
+            wrefresh(painel_w->window);
             break;
         }
         case KEY_LEFT: {
@@ -149,14 +144,10 @@ int main(void) { // int argc, char **argv
     }
 
     logging("exiting ...");
-    unpost_menu(menu);
-    free_menu(menu);
-
-    FREE_ITEMS(items, nchoices + 1);
-
+    
+    destroy_menu(menu, items);
     free_window(playlist_w);
     free_window(painel_w);
-
 
     logging(NULL);
     endwin();
@@ -180,6 +171,27 @@ void addLabel(WINDOW *win, char *str) {
     mvwaddstr(win, 0, 1, nstr);
     wrefresh(win);
     free(nstr);
+}
+
+void destroy_menu(MENU *menu, ITEM **items) {
+    unpost_menu(menu);
+    free_menu(menu);
+    for(int i = 0; items[i] != NULL; i++) {
+        free_item(items[i]);
+    }
+}
+
+MENU *create_menu(window_t *w, ITEM **items, Menu_Options options) {
+    MENU *menu = new_menu((ITEM **)items);
+    set_menu_win(menu, w->window);
+    set_menu_sub(menu, derwin(w->window, getmaxy(w->window) - 1, getmaxx(w->window) - 1, 1, 1));
+    set_menu_format(menu, getmaxy(w->window) - 3, 0);
+    set_menu_mark(menu, " * ");
+    menu_opts_off(menu, options);
+    post_menu(menu);
+    wrefresh(w->window);
+    refresh();
+    return menu;
 }
 
 void logging(char *str, ...) {

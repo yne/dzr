@@ -40,7 +40,7 @@
         layout->xDiv = layout->xMax / 4;                                       \
         layout->yDiv = layout->yMax - 3;                                       \
         logging("");                                                           \
-    } while (0);
+    } while (0);                                                               \
 
 #define CHECK_WINDOW(x)                                                        \
     do {                                                                       \
@@ -49,11 +49,7 @@
             LOG("Unable to create window %s", #x);                             \
             exit(1);                                                           \
         }                                                                      \
-    } while (0);
-
-#define FREE_ITEMS(items, size)                                                \
-    for (int i = 0; i < size; i++)                                             \
-        free_item(items[i]);
+    } while (0);                                                               \
 
 typedef struct window_t window_t;
 
