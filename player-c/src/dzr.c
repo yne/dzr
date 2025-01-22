@@ -8,7 +8,6 @@
 
 struct window_t {
     WINDOW *window;
-    window_t *subwindow;
     int y;
     int x;
     int starty;
@@ -18,9 +17,12 @@ struct window_t {
 
 void create_win(window_t *w);
 
+
 void addLabel(WINDOW *win, char *str);
 void free_window(window_t *w);
 void logging(char *str, ...);
+
+// https://pubs.opengroup.org/onlinepubs/7908799/xcurses/intovix.html
 
 int main(void) { // int argc, char **argv
 
@@ -33,7 +35,6 @@ int main(void) { // int argc, char **argv
     playlist_w->x = layout->xDiv;
     playlist_w->starty = 0;
     playlist_w->startx = 0;
-    playlist_w->subwindow = NULL;
 
     window_t *painel_w = calloc(1, sizeof(window_t));
     painel_w->label = "Painel";
@@ -41,18 +42,10 @@ int main(void) { // int argc, char **argv
     painel_w->x = layout->xMax - layout->xDiv;
     painel_w->starty = 0;
     painel_w->startx = layout->xDiv;
-
-    painel_w->subwindow = calloc(1, sizeof(window_t));
-    painel_w->subwindow->label = "Search (track[t]/artist[a]/album[b]/playlist[p]/user[u]/radio[r])";
-    painel_w->subwindow->y = 3;
-    painel_w->subwindow->x = getmaxx(painel_w->window) - 2;
-    painel_w->subwindow->starty = 1;
-    painel_w->subwindow->startx = layout->xDiv + 1;
-
+    
     create_win(playlist_w);
     
     create_win(painel_w);
-
 
     // create menus
     int nchoices = getmaxy(playlist_w->window) - 5;
@@ -70,8 +63,7 @@ int main(void) { // int argc, char **argv
     MENU *menu = new_menu((ITEM **)items);
 
     set_menu_win(menu, playlist_w->window);
-    set_menu_sub(menu, subwin(playlist_w->window, getmaxy(playlist_w->window) - 1,
-                              getmaxx(playlist_w->window) - 1, 1, 1));
+    set_menu_sub(menu, subwin(playlist_w->window, getmaxy(playlist_w->window) - 1, getmaxx(playlist_w->window) - 1, 1, 1));
     set_menu_format(menu, nchoices, 0);
     set_menu_mark(menu, " * ");
     menu_opts_off(menu, O_ONEVALUE);
@@ -180,16 +172,6 @@ void create_win(window_t *w) {
     addLabel(w->window, w->label);
     refresh();
     wrefresh(w->window);
-    if (w->subwindow != NULL) {
-        window_t *subw = &w->subwindow;
-        subw->window = derwin(w->window, subw->y, subw->x, subw->starty, subw->startx);
-        printf("subw: %p\n", (void *) subw->window);
-        CHECK_WINDOW(subw->window);
-        box(subw->window, 0, 0);
-        addLabel(subw->window, subw->label);
-        refresh();
-        wrefresh(subw->window);
-    }
 }
 
 void addLabel(WINDOW *win, char *str) {
@@ -215,7 +197,7 @@ void logging(char *str, ...) {
 
     if (str == NULL) {
         if (logging->window != NULL) {
-            delwin(logging->window);
+            free_window(logging);
             LOG("Destroyed logging window");
         }
         return;
@@ -247,9 +229,6 @@ void free_window(window_t *w) {
         delwin(w->window);
         free(w->label);
         free(w);
-    }
-    if(w->subwindow != NULL) {
-        free_window(w->subwindow);
     }
 }
 
