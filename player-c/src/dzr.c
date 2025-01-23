@@ -66,7 +66,7 @@ int main(void) { // int argc, char **argv
     items = (ITEM **)realloc(items, sizeof(ITEM *) * (nchoices + 1));
     items[nchoices] = NULL;
 
-    create_menu(painel_w, items, O_SELECTABLE);   
+    create_menu(painel_w, items, O_ONEVALUE);   
 
     // refresh();
 
@@ -200,6 +200,7 @@ void create_menu(window_t *w, ITEM **items, Menu_Options options) {
     set_menu_format(w->menu, getmaxy(w->window) - 3, 0);
     set_menu_mark(w->menu, " * ");
     menu_opts_off(w->menu, options);
+    menu_opts_off(w->menu, O_SHOWDESC);
     post_menu(w->menu);
     wrefresh(w->window);
     refresh();
