@@ -16,7 +16,7 @@
 #ifdef DEBUG
 #define LOG(fmt, ...) \
     do { \
-        fprintf(stderr, "DEBUG: " fmt "\n", ##__VA_ARGS__); \
+        fprintf(stderr, "\nDEBUG: " fmt "\n", ##__VA_ARGS__); \
         fflush(stderr); \
     } while (0)
 #else
@@ -29,6 +29,11 @@
 
 #define NCURSES_TRACE 1
 
+void logging(char t, char *str, ...);
+
+#define LOGGING(str, ...) logging('L', str, ##__VA_ARGS__);
+#define COMMAND(str, ...) logging('C', str, ##__VA_ARGS__);
+
 #define INIT_CURSES()                                                          \
     do {                                                                       \
         initscr();                                                             \
@@ -39,7 +44,7 @@
         getmaxyx(stdscr, layout->yMax, layout->xMax);                          \
         layout->xDiv = layout->xMax / 4;                                       \
         layout->yDiv = layout->yMax - 3;                                       \
-        logging("");                                                           \
+        LOGGING("");                                                           \
     } while (0);                                                               \
 
 #define CHECK_WINDOW(x)                                                        \

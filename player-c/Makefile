@@ -44,9 +44,11 @@ clean:
 	rm -rf $(OBJ_DIR) $(BUILD_DIR)/$(TARGET)
 	@echo "Limpeza concluída."  # Log para confirmar conclusão da limpeza
 
-run: $(BUILD_DIR)/$(TARGET)
+run: $(BUILD_DIR)/$(TARGET) 
 	@echo "Executando o programa..."
-	./$(BUILD_DIR)/$(TARGET)
+	@echo "Caminho do executável: ./$(BUILD_DIR)/$(TARGET)"
+	@ls $(BUILD_DIR)  # Lista os arquivos no diretório de build
+	exec ./$(BUILD_DIR)/$(TARGET)
 
 debug:
 	$(GDB) -w $(BUILD_DIR)/$(TARGET)

@@ -26,7 +26,10 @@ void drive_menu(window_t *w, int key);
 
 void addLabel(WINDOW *win, char *str);
 void free_window(window_t *w);
-void logging(char *str, ...);
+
+
+void type_search(window_t *win, char *str);
+
 
 // https://pubs.opengroup.org/onlinepubs/7908799/xcurses/intovix.html
 
@@ -37,7 +40,7 @@ int main(void) { // int argc, char **argv
 
     window_t *playlist_w = calloc(1, sizeof(window_t));
     playlist_w->label = "Playlist";
-    playlist_w->y = layout->yMax;
+    playlist_w->y = layout->yMax - 3;
     playlist_w->x = layout->xDiv;
     playlist_w->starty = 0;
     playlist_w->startx = 0;
@@ -49,6 +52,14 @@ int main(void) { // int argc, char **argv
     painel_w->starty = 0;
     painel_w->startx = layout->xDiv;
     
+    window_t *search_w = calloc(1, sizeof(window_t));
+    search_w->label = "Search";
+    search_w->y = 3;
+    search_w->x = painel_w->x / 3;
+    search_w->starty = 1;
+    search_w->startx = painel_w->x - 2;
+    
+
     create_win(playlist_w);
     
     create_win(painel_w);
@@ -72,78 +83,89 @@ int main(void) { // int argc, char **argv
 
     int ch;
     while ((ch = getch()) != CTRL_D) {
-        logging("key: %d char: %c", ch, ch);
+        LOGGING("key: %d char: %c", ch, ch);
         switch (ch) {
         case KEY_UP: {
-            logging("up");
+            COMMAND("up");
             drive_menu(painel_w, REQ_UP_ITEM);
             break;
         }
         case KEY_DOWN: {
-            logging("down");
+            COMMAND("down");
             drive_menu(painel_w, REQ_DOWN_ITEM);
             break;
         }
         case KEY_NPAGE: {
-            logging("previous page");
+            COMMAND("previous page");
             drive_menu(painel_w, REQ_SCR_DPAGE);
             break;
         }
         case KEY_PPAGE: {
-            logging("next page");
+            COMMAND("next page");
             drive_menu(painel_w, REQ_SCR_UPAGE);
             break;
         }
         case KEY_LEFT: {
-            logging("left");
+            COMMAND("left");
             break;
         }
         case KEY_RIGHT: {
-            logging("right");
+            COMMAND("right");
             break;
         }
         case ' ': {
-            logging("backspace");
+            COMMAND("backspace");
             ITEM *it = current_item(playlist_w->menu);
             int index = item_index(it);
-            logging("selecting item %d", index);
+            LOGGING("selecting item %d", index);
             menu_driver(playlist_w->menu, REQ_TOGGLE_ITEM);
-
             break;
         }
         case KEY_F(1): {
-            logging("f1");
+            COMMAND("f1");
+            
             break;
         }
         case ':': {
-            logging("command");
+            COMMAND("command");
             ch = getch();
             switch (ch) {
-            case 't':
-                logging("track");
-                char track[100];
-                getstr(track);
-                logging(track);
-                // free(track);
-                break;
-            case 'a':
-                logging("artist");
-                break;
-            case 'b':
-                logging("album");
-                break;
-            case 'p':
-                logging("playlist");
-                break;
-            case 'u':
-                logging("user");
-                break;
-            case 'r':
-                logging("radio");
-                break;
-            default:
-                logging("invalid");
-                break;
+                case 't':{
+                    COMMAND("track");
+                    create_win(search_w);
+                    char *track = calloc(100, sizeof(char));
+                    type_search(search_w, track);
+                    wclear(search_w->window);
+                    delwin(search_w->window);
+                    wrefresh(search_w->window);
+                    refresh();
+
+                    break;
+                }
+                case 'a':{
+                    COMMAND("artist");
+                    break;
+                }
+                case 'b':{
+                    COMMAND("album");
+                    break;
+                }
+                case 'p':{
+                    COMMAND("playlist");
+                    break;
+                }
+                case 'u':{
+                    COMMAND("user");
+                    break;
+                }
+                case 'r':{
+                    COMMAND("radio");
+                    break;
+                }
+                default:{
+                    COMMAND("invalid");
+                    break;
+                }
             }
             break;
         }
@@ -152,19 +174,44 @@ int main(void) { // int argc, char **argv
         }
     }
 
-    logging("exiting ...");
+    LOGGING("exiting ...");
     
     destroy_menu(playlist_w, items);
     free_window(playlist_w);
     free_window(painel_w);
 
-    logging(NULL);
+    logging('0', NULL);
 
     endwin();
     exit(0);
     return 0;
 }
 
+void clear_and_write(window_t * w, char *str) {
+    wclear(w->window);
+    box(w->window, 0, 0);
+    addLabel( w->window, w->label);
+    mvwaddstr(w->window, 1, 3, str);
+    wrefresh(w->window);
+}
+
+void type_search(window_t *win, char * str) {
+    int i = 0;
+    int c;
+    while ((c = getch()) != '\n') {
+        if (c == KEY_BACKSPACE) {
+            if (i > 0) {
+                i--;
+                str[i] = '\0';
+                clear_and_write(win, str);
+            }
+            continue;
+        }
+        str[i++] = c;
+        clear_and_write(win, str);
+    }
+    str[i] = '\0';
+}
 
 void create_win(window_t *w) {
     w->window = newwin(w->y, w->x, w->starty, w->startx);
@@ -176,9 +223,11 @@ void create_win(window_t *w) {
 }
 
 void addLabel(WINDOW *win, char *str) {
-    char *nstr = malloc(sizeof(char) * (strlen(str) + 2));
-    sprintf(nstr, "| %s |", str);
-    mvwaddstr(win, 0, 1, nstr);
+    size_t len = strlen(str);
+    char *nstr = malloc(len + 3);
+    sprintf(nstr, "| %.*s |", (int)len, str);
+    int x = getmaxx(win) * 0.10;
+    mvwaddstr(win, 0, x, nstr);
     wrefresh(win);
     free(nstr);
 }
@@ -196,9 +245,10 @@ void destroy_menu(window_t *w, ITEM **items) {
 void create_menu(window_t *w, ITEM **items, Menu_Options options) {
     w->menu = new_menu((ITEM **)items);
     set_menu_win(w->menu, w->window);
-    set_menu_sub(w->menu, derwin(w->window, getmaxy(w->window) - 1, getmaxx(w->window) - 1, 1, 1));
+    set_menu_sub(w->menu, derwin(w->window, getmaxy(w->window) - 1, 10, 1, 1));
     set_menu_format(w->menu, getmaxy(w->window) - 3, 0);
     set_menu_mark(w->menu, " * ");
+
     menu_opts_off(w->menu, options);
     menu_opts_off(w->menu, O_SHOWDESC);
     post_menu(w->menu);
@@ -212,9 +262,11 @@ void drive_menu(window_t *w, int key) {
     refresh();
 }
 
-void logging(char *str, ...) {
+void logging(char t, char *str, ...) {
    
     static window_t *logging;
+
+    static window_t *command;
 
     if(logging == NULL) {
         logging = calloc(1, sizeof(window_t));
@@ -225,33 +277,51 @@ void logging(char *str, ...) {
         logging->startx = layout->xDiv;
     }
 
+    if(command == NULL) {
+        command = calloc(1, sizeof(window_t));
+        command->label = "Command";
+        command->y = layout->yMax - layout->yDiv;
+        command->x = layout->xDiv;
+        command->starty = layout->yDiv;
+        command->startx = 0;
+    }
     if (str == NULL) {
-        if (logging->window != NULL) {
+        if(logging->window != NULL) {
             free_window(logging);
             LOG("Destroyed logging window");
         }
+        if(command->window != NULL) {
+            free_window(command);
+            LOG("Destroyed command window");
+        }
         return;
     } else {
-        if (logging->window == NULL) {
+        if(logging->window == NULL) {
             create_win(logging);
             LOG("Created logging window");
         }
+        if(command->window == NULL) {
+            create_win(command);
+            LOG("Created command window");
+        }
+
     }
     va_list args;
     va_start(args, str);
 
-    wclear(logging->window);
-    box(logging->window, 0, 0);
-    addLabel(logging->window, "Logging");
-
     char buffer[256];
     vsnprintf(buffer, sizeof(buffer), str, args);
-    mvwaddstr(logging->window, 1, 3, buffer);
-    wrefresh(logging->window);
-
-    LOG("%s", buffer);
-
     va_end(args);
+
+    if(t == 'C') {
+        clear_and_write(command, buffer);
+    }
+    if(t == 'L') {
+        clear_and_write(logging, buffer);
+    }
+    
+    refresh();
+    LOG("%s", buffer);
 }
 
 void free_window(window_t *w) {
