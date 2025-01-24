@@ -27,8 +27,9 @@ void drive_menu(window_t *w, int key);
 void addLabel(WINDOW *win, char *str);
 void free_window(window_t *w);
 
-
 void type_search(window_t *win, char *str);
+
+char * search_input(window_t *win);
 
 
 // https://pubs.opengroup.org/onlinepubs/7908799/xcurses/intovix.html
@@ -132,13 +133,8 @@ int main(void) { // int argc, char **argv
             switch (ch) {
                 case 't':{
                     COMMAND("track");
-                    create_win(search_w);
-                    char *track = calloc(100, sizeof(char));
-                    type_search(search_w, track);
-                    wclear(search_w->window);
-                    delwin(search_w->window);
-                    wrefresh(search_w->window);
-                    refresh();
+                    char* track = search_input(search_w);
+                    LOGGING("track: %s", track);
 
                     break;
                 }
@@ -193,6 +189,17 @@ void clear_and_write(window_t * w, char *str) {
     addLabel( w->window, w->label);
     mvwaddstr(w->window, 1, 3, str);
     wrefresh(w->window);
+}
+
+char * search_input(window_t *w) {
+    create_win(w);
+    char *track = calloc(100, sizeof(char));
+    type_search(w, track);
+    wclear(w->window);
+    delwin(w->window);
+    wrefresh(w->window);
+    refresh();
+    return track;
 }
 
 void type_search(window_t *win, char * str) {
