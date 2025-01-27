@@ -2,11 +2,11 @@
 CC = gcc
 CXX = g++
 GDB = gdb
-CFLAGS = -Wall -Wextra -pedantic -Werror -Wpedantic
+CFLAGS = -Wall -Wextra -pedantic -Werror -Wpedantic -std=c23 -I/ucrt64/include
 CXXFLAGS = -Wall -std=c++11
 
 # Flags adicionais para o linker
-LDFLAGS = -lncursesw -lmenuw # Adiciona a biblioteca pdcurses ao processo de linkagem
+LDFLAGS = -lncursesw -lmenuw -L/ucrt64/lib -lcurl # Adiciona a biblioteca pdcurses ao processo de linkagem
 
 # Nome do arquivo de saída (EXE para Windows)
 TARGET = dzr.exe
@@ -44,7 +44,8 @@ clean:
 	rm -rf $(OBJ_DIR) $(BUILD_DIR)/$(TARGET)
 	@echo "Limpeza concluída."  # Log para confirmar conclusão da limpeza
 
-run: $(BUILD_DIR)/$(TARGET) 
+
+run: clean $(BUILD_DIR)/$(TARGET) 
 	@echo "Executando o programa..."
 	@echo "Caminho do executável: ./$(BUILD_DIR)/$(TARGET)"
 	@ls $(BUILD_DIR)  # Lista os arquivos no diretório de build

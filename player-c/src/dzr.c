@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+
 struct window_t {
     WINDOW *window;
     MENU *menu;
@@ -31,12 +32,13 @@ void type_search(window_t *win, char *str);
 
 char * search_input(window_t *win);
 
+int http_get(char *url, void *response_data);
 
 // https://pubs.opengroup.org/onlinepubs/7908799/xcurses/intovix.html
 
-int main(void) { // int argc, char **argv
 
-    // init screen and sets up screen
+int main(void) { // int argc, char **argv
+    
     INIT_CURSES();
 
     window_t *playlist_w = calloc(1, sizeof(window_t));
@@ -69,6 +71,7 @@ int main(void) { // int argc, char **argv
     int nchoices = 100;
     ITEM **items = NULL;
 
+
     for (int i = 0; i < nchoices; i++) {
         items = (ITEM **) realloc(items, sizeof(ITEM *) * (i + 1));
         char *str = malloc(sizeof(char) * 20);
@@ -78,7 +81,7 @@ int main(void) { // int argc, char **argv
     items = (ITEM **)realloc(items, sizeof(ITEM *) * (nchoices + 1));
     items[nchoices] = NULL;
 
-    create_menu(painel_w, items, O_ONEVALUE);   
+    create_menu(painel_w, items, O_ONEVALUE);     
 
     // refresh();
 
@@ -116,10 +119,10 @@ int main(void) { // int argc, char **argv
         }
         case ' ': {
             COMMAND("backspace");
-            ITEM *it = current_item(playlist_w->menu);
+            ITEM *it = current_item(painel_w->menu);
             int index = item_index(it);
             LOGGING("selecting item %d", index);
-            menu_driver(playlist_w->menu, REQ_TOGGLE_ITEM);
+            menu_driver(painel_w->menu, REQ_TOGGLE_ITEM);
             break;
         }
         case KEY_F(1): {
@@ -172,7 +175,7 @@ int main(void) { // int argc, char **argv
 
     LOGGING("exiting ...");
     
-    destroy_menu(playlist_w, items);
+    destroy_menu(painel_w, items);
     free_window(playlist_w);
     free_window(painel_w);
 
@@ -180,6 +183,52 @@ int main(void) { // int argc, char **argv
 
     endwin();
     exit(0);
+    return 0;
+}
+
+size_t write_data(void *ptr, size_t size, size_t nmemb, void* stream) {
+    size_t total_size = size * nmemb;
+    strncat(stream, ptr, total_size);
+    return total_size;
+}
+
+int http_get(char *url, void *response_data){
+    CURL *curl = curl_easy_init();
+    if(curl) {
+        curl_easy_setopt(curl, CURLOPT_URL, url);
+
+        char *proxy = getenv("HTTP_PROXY");
+        if(proxy) {
+            int atPos = strcspn(proxy, "@");
+            printf("proxy: %s\n", proxy);
+            printf("atPos: %d\n", atPos);
+            printf("proxy: %s\n", proxy + atPos);
+
+            // curl_easy_setopt(curl, CURLOPT_PROXY, proxy + atPos);
+            // curl_easy_setopt(curl, CURLOPT_PROXYUSERPWD, proxy);
+            
+            // curl_easy_setopt(curl, CURLOPT_PROXY, "172.31.136.14:128");
+            // curl_easy_setopt(curl, CURLOPT_PROXYUSERPWD, "manoel.messias:jeremias");
+        }
+        #ifdef SKIP_PEER_VERIFICATION
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        #endif
+        #ifdef SKIP_HOSTNAME_VERIFICATION
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+        #endif
+
+        curl_easy_setopt(curl, CURLOPT_CA_CACHE_TIMEOUT, 604800L);
+        
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, response_data);
+        CURLcode res = curl_easy_perform(curl);
+
+        if (res != CURLE_OK) {
+            LOGGING("curl_easy_perform() failed: %s", curl_easy_strerror(res));
+        }
+
+        curl_easy_cleanup(curl);
+    }
     return 0;
 }
 
@@ -232,7 +281,7 @@ void create_win(window_t *w) {
 void addLabel(WINDOW *win, char *str) {
     size_t len = strlen(str);
     char *nstr = malloc(len + 3);
-    sprintf(nstr, "| %.*s |", (int)len, str);
+    sprintf(nstr, " %.*s ", (int)len, str);
     int x = getmaxx(win) * 0.10;
     mvwaddstr(win, 0, x, nstr);
     wrefresh(win);

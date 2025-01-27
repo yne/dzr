@@ -9,6 +9,7 @@
 #include <ncurses/form.h>
 #include <ncurses/menu.h>
 #include <ncurses/panel.h>
+#include <curl/curl.h>
 #endif
 
 #define DEBUG
@@ -16,7 +17,7 @@
 #ifdef DEBUG
 #define LOG(fmt, ...) \
     do { \
-        fprintf(stderr, "\nDEBUG: " fmt "\n", ##__VA_ARGS__); \
+        fprintf(stderr, "DEBUG: " fmt "\n\n", ##__VA_ARGS__); \
         fflush(stderr); \
     } while (0)
 #else
