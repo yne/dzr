@@ -3,3 +3,33 @@
 /.vscode
 /build
 /player-c/build
+
+# Diretório de build
+player-c/build
+CMakeFiles/
+CMakeCache.txt
+Makefile
+cmake_install.cmake
+
+# Arquivos de log e temporários
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Binários e bibliotecas compiladas
+/bin/
+*.o
+*.a
+*.so
+*.dll
+*.dylib
+*.exe
+
+# Arquivos de depuração
+*.dSYM/
+vgcore.*
+
+# Arquivos específicos do sistema operacional
+.DS_Store
+Thumbs.db
