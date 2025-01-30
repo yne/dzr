@@ -52,6 +52,8 @@ char * search_input(window_t *win);
 
 void * http_get(char *url);
 
+void http_post(char *url, struct curl_slist * headers, cJSON *json);
+
 // https://pubs.opengroup.org/onlinepubs/7908799/xcurses/intovix.html
 
 
@@ -275,7 +277,7 @@ void * http_get(char *url){
         #ifdef SKIP_HOSTNAME_VERIFICATION
             curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
         #endif
-
+        curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
         curl_easy_setopt(curl, CURLOPT_CA_CACHE_TIMEOUT, 604800L);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, response_data);
@@ -289,6 +291,64 @@ void * http_get(char *url){
     }
     curl_global_cleanup();
     return (void *) response_data;
+}
+
+void http_post(char *url, struct curl_slist * headers, cJSON *json) {
+
+    curl_global_init(CURL_GLOBAL_ALL);
+    CURL *curl = curl_easy_init();
+    if(curl) {
+        curl_easy_setopt(curl, CURLOPT_URL, url);
+        char *proxy = getenv("HTTP_PROXY");
+        if(proxy) {
+            char *at = strchr(proxy, '@');
+            char *userpwd = NULL;
+            char *host = NULL;
+            char *port = NULL;
+
+            if(at) {
+                userpwd = strndup(proxy, at - proxy);
+                char *hostport = at + 1;
+                char *colon = strchr(hostport, ':');
+
+                if(colon) {
+                    host = strndup(hostport, colon - hostport);
+                    port = colon + 1;
+
+                    curl_easy_setopt(curl, CURLOPT_PROXY, host);
+                    curl_easy_setopt(curl, CURLOPT_PROXYPORT, atoi(port));
+                } else {
+                    curl_easy_setopt(curl, CURLOPT_PROXY, hostport);
+                }
+                curl_easy_setopt(curl, CURLOPT_PROXYUSERPWD, userpwd);
+            } else {
+                curl_easy_setopt(curl, CURLOPT_PROXY, proxy);
+            }
+
+            free(userpwd);
+            free(host);
+            free(port);
+            free(proxy);
+        }
+        #ifdef SKIP_PEER_VERIFICATION
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        #endif
+        #ifdef SKIP_HOSTNAME_VERIFICATION
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+        #endif
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+        curl_easy_setopt(curl, CURLOPT_POST, 1L);
+        curl_easy_setopt(curl, CURLOPT_CA_CACHE_TIMEOUT, 604800L);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, cJSON_PrintSize(json));
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, cJSON_Print(json));
+        CURLcode res = curl_easy_perform(curl);
+        if (res != CURLE_OK) {
+            LOGGING("curl_easy_perform() failed: %s", curl_easy_strerror(res));
+        }
+        curl_easy_cleanup(curl);
+    }
+    curl_global_cleanup();
 }
 
 void clear_and_write(window_t *w, char *str) {
