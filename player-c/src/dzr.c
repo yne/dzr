@@ -2,6 +2,29 @@
 #include <string.h>
 #include <cjson/cJSON.h>
 
+#define API_URL(path) "https://api.deezer.com/" path
+
+enum Commands{
+    CTRL_D = 4,
+    COMMAND = ':',
+    UP = KEY_UP,
+    DOWN = KEY_DOWN,
+    LEFT = KEY_LEFT,
+    RIGHT = KEY_RIGHT,
+    ENTER = 10,
+    PAGE_UP = KEY_NPAGE,
+    PAGE_DOWN = KEY_PPAGE,
+    SELECT = ' ',
+
+    TRACK = 't',
+    ALBUM = 'b',
+    ARTIST = 'a',
+    PLAYLIST = 'p',
+    USER = 'u',
+    GENRE = 'g',
+    RADIO = 'r'
+};
+
 struct window_t {
     WINDOW *window;
     MENU *menu;
@@ -36,7 +59,7 @@ int main(void) { // int argc, char **argv
     
     init_curses();
 
-    buffer_t * response = (buffer_t *) http_get("https://api.deezer.com/search/playlist?q=HARDBASS");
+    buffer_t * response = (buffer_t *) http_get(API_URL("/search/playlist?q=HARDBASS"));
 
     cJSON *json = cJSON_ParseWithLength(response->data, response->size);
     LOG("%s", cJSON_Print(json));
@@ -93,35 +116,35 @@ int main(void) { // int argc, char **argv
     while ((ch = getch()) != CTRL_D) {
         LOGGING("key: %d char: %c", ch, ch);
         switch (ch) {
-        case KEY_UP: {
+        case UP: {
             COMMAND("up");
             drive_menu(painel_w, REQ_UP_ITEM);
             break;
         }
-        case KEY_DOWN: {
+        case DOWN: {
             COMMAND("down");
             drive_menu(painel_w, REQ_DOWN_ITEM);
             break;
         }
-        case KEY_NPAGE: {
+        case PAGE_UP: {
             COMMAND("previous page");
             drive_menu(painel_w, REQ_SCR_DPAGE);
             break;
         }
-        case KEY_PPAGE: {
+        case PAGE_DOWN: {
             COMMAND("next page");
             drive_menu(painel_w, REQ_SCR_UPAGE);
             break;
         }
-        case KEY_LEFT: {
+        case LEFT: {
             COMMAND("left");
             break;
         }
-        case KEY_RIGHT: {
+        case RIGHT: {
             COMMAND("right");
             break;
         }
-        case ' ': {
+        case SELECT: {
             COMMAND("backspace");
             ITEM *it = current_item(painel_w->menu);
             int index = item_index(it);
@@ -134,34 +157,34 @@ int main(void) { // int argc, char **argv
             
             break;
         }
-        case ':': {
+        case COMMAND: {
             COMMAND("command");
             ch = getch();
             switch (ch) {
-                case 't':{
+                case TRACK:{
                     COMMAND("track");
                     char* track = search_input(search_w);
                     LOGGING("track: %s", track);
 
                     break;
                 }
-                case 'a':{
+                case ARTIST:{
                     COMMAND("artist");
                     break;
                 }
-                case 'b':{
+                case ALBUM:{
                     COMMAND("album");
                     break;
                 }
-                case 'p':{
+                case PLAYLIST:{
                     COMMAND("playlist");
                     break;
                 }
-                case 'u':{
+                case USER:{
                     COMMAND("user");
                     break;
                 }
-                case 'r':{
+                case RADIO:{
                     COMMAND("radio");
                     break;
                 }

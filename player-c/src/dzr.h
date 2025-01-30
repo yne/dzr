@@ -29,10 +29,6 @@
 #define LOG(fmt, ...)
 #endif
 
-#define EXIT 17
-
-#define CTRL_D 4
-
 static void logging(char t, char *str, ...);
 
 #define LOGGING(str, ...) logging('L', str, ##__VA_ARGS__);
