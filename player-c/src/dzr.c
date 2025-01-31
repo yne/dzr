@@ -2,7 +2,9 @@
 #include <string.h>
 #include <cjson/cJSON.h>
 
-#define API_URL(path) "https://api.deezer.com/" path
+#define API_URL "https://api.deezer.com/"
+#define API_URL_SEARCH(path, query) API_URL "/search/" path "?q=" #query "&limit=100000"// http_get()
+#define API_URL_SEARCH_ID(path, id) (http_get(API_URL "/" (path) "/" id))
 
 enum Commands{
     CTRL_D = 4,
@@ -28,6 +30,7 @@ enum Commands{
 struct window_t {
     WINDOW *window;
     MENU *menu;
+    ITEM **items;
     int y;
     int x;
     int starty;
@@ -37,9 +40,9 @@ struct window_t {
 
 void create_win(window_t *w);
 
-void create_menu(window_t *w, ITEM **items, Menu_Options options);
+void create_menu(window_t *w, Menu_Options options);
 
-void destroy_menu(window_t *w, ITEM **items);
+void destroy_menu(window_t *w);
 
 void drive_menu(window_t *w, int key);
 
@@ -50,7 +53,7 @@ void type_search(window_t *win, char *str);
 
 char * search_input(window_t *win);
 
-void * http_get(char *url);
+buffer_t * http_get(char *url);
 
 void http_post(char *url, struct curl_slist * headers, cJSON *json);
 
@@ -60,15 +63,6 @@ void http_post(char *url, struct curl_slist * headers, cJSON *json);
 int main(void) { // int argc, char **argv
     
     init_curses();
-
-    buffer_t * response = (buffer_t *) http_get(API_URL("/search/playlist?q=HARDBASS"));
-
-    cJSON *json = cJSON_ParseWithLength(response->data, response->size);
-    LOG("%s", cJSON_Print(json));
-
-    cJSON *data = cJSON_GetObjectItem(json, "data");
-    cJSON *list = cJSON_GetArrayItem(data, 0);
-    cJSON *id = cJSON_GetObjectItem(list, "id");
 
     window_t *playlist_w = calloc(1, sizeof(window_t));
     strcpy(playlist_w->label, "Playlist");
@@ -97,20 +91,20 @@ int main(void) { // int argc, char **argv
     create_win(painel_w);
 
     // create menus
-    int nchoices = 100;
-    ITEM **items = NULL;
+    // int nchoices = 100;
+    // ITEM **items = NULL;
 
 
-    for (int i = 0; i < nchoices; i++) {
-        items = (ITEM **) realloc(items, sizeof(ITEM *) * (i + 1));
-        char *str = malloc(sizeof(char) * 20);
-        sprintf(str, "%d item", i);
-        items[i] = new_item(str, "abcd");
-    }
-    items = (ITEM **)realloc(items, sizeof(ITEM *) * (nchoices + 1));
-    items[nchoices] = NULL;
+    // for (int i = 0; i < nchoices; i++) {
+    //     items = (ITEM **) realloc(items, sizeof(ITEM *) * (i + 1));
+    //     char *str = malloc(sizeof(char) * 20);
+    //     sprintf(str, "%d item", i);
+    //     items[i] = new_item(str, "abcd");
+    // }
+    // items = (ITEM **)realloc(items, sizeof(ITEM *) * (nchoices + 1));
+    // items[nchoices] = NULL;
 
-    create_menu(painel_w, items, O_ONEVALUE);     
+    // create_menu(painel_w, items, O_ONEVALUE);     
 
     // refresh();
 
@@ -166,8 +160,26 @@ int main(void) { // int argc, char **argv
                 case TRACK:{
                     COMMAND("track");
                     char* track = search_input(search_w);
-                    LOGGING("track: %s", track);
-
+                    char * url = API_URL_SEARCH("track", track);
+                    LOGGING("url: %s", API_URL_SEARCH("track", track));
+                    // cJSON *json = cJSON_ParseWithLength(response_data->data, response_data->size);
+                    // cJSON *data = cJSON_GetObjectItem(json, "data");
+                    // int size = cJSON_GetArraySize(data);
+                    // painel_w->items = malloc(sizeof(ITEM *) * size);
+                    // for (int i = 0; i < size; i++) {
+                    //     cJSON *aItem = cJSON_GetArrayItem(data, i);
+                    //     cJSON *title = cJSON_GetObjectItem(aItem, "title");
+                    //     cJSON *artist = cJSON_GetObjectItem(aItem, "artist");
+                    //     // cJSON *id = cJSON_GetObjectItem(aItem, "id");
+                    //     painel_w->items[i] = new_item(cJSON_GetStringValue(title), cJSON_GetStringValue(artist));
+                        
+                    // }
+                    // create_menu(painel_w, O_ONEVALUE);
+                    free(track);
+                    // cJSON_free(json);
+                    // cJSON_free(data);
+                    // free(response_data->data);
+                    // free(response_data);
                     break;
                 }
                 case ARTIST:{
@@ -204,7 +216,7 @@ int main(void) { // int argc, char **argv
 
     LOGGING("exiting ...");
     
-    destroy_menu(painel_w, items);
+    
     free_window(playlist_w);
     free_window(painel_w);
 
@@ -229,7 +241,7 @@ size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream) {
     b->data[b->size] = 0;
     return total_size;
 }
-void * http_get(char *url){
+buffer_t * http_get(char *url){
     
     buffer_t *response_data = malloc(sizeof(buffer_t));
     response_data->data = malloc(1);
@@ -290,7 +302,7 @@ void * http_get(char *url){
         curl_easy_cleanup(curl);
     }
     curl_global_cleanup();
-    return (void *) response_data;
+    return response_data;
 }
 
 void http_post(char *url, struct curl_slist * headers, cJSON *json) {
@@ -340,8 +352,9 @@ void http_post(char *url, struct curl_slist * headers, cJSON *json) {
 
         curl_easy_setopt(curl, CURLOPT_POST, 1L);
         curl_easy_setopt(curl, CURLOPT_CA_CACHE_TIMEOUT, 604800L);
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, cJSON_PrintSize(json));
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, cJSON_Print(json));
+        char * json_str = cJSON_Print(json);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, strlen(json_str));
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_str);
         CURLcode res = curl_easy_perform(curl);
         if (res != CURLE_OK) {
             LOGGING("curl_easy_perform() failed: %s", curl_easy_strerror(res));
@@ -432,7 +445,7 @@ void addLabel(WINDOW *win, char *str) {
     free(nstr);
 }
 
-void destroy_menu(window_t *w, ITEM **items) {
+void destroy_menu(window_t *w) {
     if (w == NULL || w->menu == NULL) {
         return;
     }
@@ -441,26 +454,39 @@ void destroy_menu(window_t *w, ITEM **items) {
     free_menu(w->menu);
     w->menu = NULL;
 
-    if (items == NULL) {
+    if (w->items == NULL) {
         return;
     }
 
-    for (int i = 0; items[i] != NULL; i++) {
-        free_item(items[i]);
-        items[i] = NULL;
+    for (int i = 0; w->items[i] != NULL; i++) {
+        free_item(w->items[i]);
+        w->items[i] = NULL;
     }
 }
 
-void create_menu(window_t *w, ITEM **items, Menu_Options options) {
-    w->menu = new_menu((ITEM **)items);
+void create_menu(window_t *w, Menu_Options options) {
+    if (w == NULL || w->items == NULL) {
+        return;
+    }
+
+    w->menu = new_menu((ITEM **) w->items);
+    if (w->menu == NULL) {
+        return;
+    }
+
     set_menu_win(w->menu, w->window);
     set_menu_sub(w->menu, derwin(w->window, getmaxy(w->window) - 1, 10, 1, 1));
     set_menu_format(w->menu, getmaxy(w->window) - 3, 0);
     set_menu_mark(w->menu, " * ");
 
     menu_opts_off(w->menu, options);
-    menu_opts_off(w->menu, O_SHOWDESC);
-    post_menu(w->menu);
+
+    if (post_menu(w->menu) != E_OK) {
+        free_menu(w->menu);
+        w->menu = NULL;
+        return;
+    }
+
     wrefresh(w->window);
     refresh();
 }
@@ -545,6 +571,9 @@ void free_window(window_t *w) {
     if (w != NULL) {
         if(w->window != NULL){
             delwin(w->window);
+        }
+        if(w->menu != NULL){
+            destroy_menu(w);
         }
         free(w);
     }
