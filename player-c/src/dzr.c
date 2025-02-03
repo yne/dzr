@@ -63,6 +63,8 @@ char * search_input();
 
 buffer_t * api_url_search(const char *path, const char *query);
 
+buffer_t * api_url_id(const char *path, const char *id);
+
 buffer_t * http_get(char *url);
 
 buffer_t * http_post(char *url, struct curl_slist * headers, cJSON *json);
@@ -180,14 +182,12 @@ int main(void) { // int argc, char **argv
                         char *id_item = calloc(need + 1, sizeof(char));
                         sprintf(id_item, "%0.f", cJSON_GetNumberValue(id));
 
-
                         painel_w->items[i] = new_item(name_item, id_item);
                         
                     }
                     create_menu(painel_w, painel_options);
                     free(track);
                     cJSON_free(json);
-                    cJSON_free(data);
                     free(response_data->data);
                     free(response_data);
                     break;
@@ -388,6 +388,15 @@ buffer_t * api_url_search(const char *path, const char *query) {
     char *url = malloc(needed + 1);
     if (url) {
         snprintf(url, needed + 1, "%s/search/%s?q=%s&limit=100000", API_URL, path, query);
+    }
+    return http_get(url);
+}
+
+buffer_t * api_url_id(const char *path, const char *id) {
+    int needed = snprintf(NULL, 0, "%s/%s/%s", API_URL, path, id);
+    char *url = malloc(needed + 1);
+    if (url) {
+        snprintf(url, needed + 1, "%s/%s/%s", API_URL, path, id);
     }
     return http_get(url);
 }
