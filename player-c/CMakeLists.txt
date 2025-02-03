@@ -54,6 +54,6 @@ set(SOURCES
 add_executable(dzr ${SOURCES})
 
 # Liga as bibliotecas ncurses, curl e cJSON ao executável
-target_compile_options(dzr PUBLIC -O1)
+target_compile_options(dzr PUBLIC -O1 -g3)
 target_link_libraries(dzr ${CURSES_LIBRARIES} ${CURL_LIBRARIES} ${CJSON_LIBRARY} ${MENU_LIBRARY})
 add_custom_target(run exec ./build/dzr 2>"./out.log" ALL)

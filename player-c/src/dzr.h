@@ -2,20 +2,23 @@
 #define DZR_H
 
 #ifdef __linux__
-#include <form.h>
-#include <menu.h>
-#include <ncurses.h>
-#include <panel.h>
+  #include <form.h>
+  #include <menu.h>
+  #include <ncurses.h>
+  #include <panel.h>
 #else
-#include <ncurses/curses.h>
-#include <ncurses/form.h>
-#include <ncurses/menu.h>
-#include <ncurses/panel.h>
+  #include <ncurses/curses.h>
+  #include <ncurses/form.h>
+  #include <ncurses/menu.h>
+  #include <ncurses/panel.h>
 #endif
+
 #include <curl/curl.h>
 
 #include <stdio.h>
 #include <stdlib.h>
+
+#define STRINGFY(x) x
 
 #define DEBUG 1
 
