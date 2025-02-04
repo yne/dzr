@@ -270,12 +270,21 @@ buffer_t * http_get(char *url){
             char *port = NULL;
 
             if(at) {
-                userpwd = strndup(proxy, at - proxy);
+                size_t len = at - proxy;
+                userpwd = (char *)malloc(len + 1);
+                if (userpwd) {
+                    strncpy(userpwd, proxy, len);
+                    userpwd[len] = '\0'; // Null-terminate the string
+                }
                 char *hostport = at + 1;
                 char *colon = strchr(hostport, ':');
 
                 if(colon) {
-                    host = strndup(hostport, colon - hostport);
+                    host = malloc(colon - hostport + 1);
+                    if (host) {
+                        strncpy(host, hostport, colon - hostport);
+                        host[colon - hostport] = '\0'; // Null-terminate the string
+                    }
                     port = colon + 1;
 
                     curl_easy_setopt(curl, CURLOPT_PROXY, host);
@@ -334,12 +343,21 @@ buffer_t * http_post(char *url, struct curl_slist * headers, cJSON *json) {
             char *port = NULL;
 
             if(at) {
-                userpwd = strndup(proxy, at - proxy);
+                size_t len = at - proxy;
+                userpwd = (char *)malloc(len + 1);
+                if (userpwd) {
+                    strncpy(userpwd, proxy, len);
+                    userpwd[len] = '\0'; // Null-terminate the string
+                }
                 char *hostport = at + 1;
                 char *colon = strchr(hostport, ':');
 
                 if(colon) {
-                    host = strndup(hostport, colon - hostport);
+                    host = malloc(colon - hostport + 1);
+                    if (host) {
+                        strncpy(host, hostport, colon - hostport);
+                        host[colon - hostport] = '\0'; // Null-terminate the string
+                    }
                     port = colon + 1;
 
                     curl_easy_setopt(curl, CURLOPT_PROXY, host);
@@ -627,4 +645,3 @@ void free_window(window_t *w) {
         free(w);
     }
 }
-
