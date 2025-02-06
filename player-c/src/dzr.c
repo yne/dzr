@@ -1,6 +1,9 @@
 #include "dzr.h"
 #include <string.h>
+#include <wchar.h>
 #include <cjson/cJSON.h>
+
+#define HTTP_PROXY_ENV "HTTP_PROXY_O"
 
 #define API_URL "https://api.deezer.com"
 #define GW_URL "https://www.deezer.com/ajax/gw-light.php"
@@ -166,21 +169,22 @@ int main(void) { // int argc, char **argv
                     int size = cJSON_GetArraySize(data);
                     painel_w->items = malloc(sizeof(ITEM *) * size);
                     for (int i = 0; i < size; i++) {
+
                         cJSON *aItem = cJSON_GetArrayItem(data, i);
                         cJSON *title = cJSON_GetObjectItem(aItem, "title");
                         cJSON *artist = cJSON_GetObjectItem(aItem, "artist");
                         cJSON *artistName = cJSON_GetObjectItem(artist, "name");
                         cJSON *id = cJSON_GetObjectItem(aItem, "id");
+                    
                         char * name = cJSON_GetStringValue(title);
                         char * artist_name = cJSON_GetStringValue(artistName);
-                        char * name_item = calloc(strlen(name) + strlen(artist_name) + 3, sizeof(char));
-                        strcat(name_item, name);
+                        char * name_item = calloc(strlen(name) + strlen(artist_name) + 4, sizeof(char));
+                        strcpy(name_item, name);
                         strcat(name_item, " - ");
                         strcat(name_item, artist_name);
 
-                        int need = snprintf(NULL, 0, "%0.f", cJSON_GetNumberValue(id));
-                        char *id_item = calloc(need + 1, sizeof(char));
-                        sprintf(id_item, "%0.f", cJSON_GetNumberValue(id));
+                        char id_item[32];
+                        itoa(cJSON_GetNumberValue(id), id_item, 10);
 
                         painel_w->items[i] = new_item(name_item, id_item);
                         
@@ -262,7 +266,7 @@ buffer_t * http_get(char *url){
     if(curl) {
         curl_easy_setopt(curl, CURLOPT_URL, url);
 
-        char *proxy = getenv("HTTP_PROXY");
+        char *proxy = getenv(HTTP_PROXY_ENV);
         if(proxy) {
             char *at = strchr(proxy, '@');
             char *userpwd = NULL;
@@ -270,36 +274,54 @@ buffer_t * http_get(char *url){
             char *port = NULL;
 
             if(at) {
+                // O trecho '@' existe, separa as credenciais do proxy
                 size_t len = at - proxy;
-                userpwd = (char *)malloc(len + 1);
+                userpwd = (char *)malloc(len + 1);  // Aloca espaço para as credenciais
                 if (userpwd) {
                     strncpy(userpwd, proxy, len);
                     userpwd[len] = '\0'; // Null-terminate the string
                 }
+
+                // Pega o host e a porta após o '@'
                 char *hostport = at + 1;
-                char *colon = strchr(hostport, ':');
+                char *colon = strchr(hostport, ':'); // Verifica se há uma porta
 
                 if(colon) {
-                    host = malloc(colon - hostport + 1);
+                    // Separando o host da porta
+                    host = (char *)malloc(colon - hostport + 1);
                     if (host) {
                         strncpy(host, hostport, colon - hostport);
                         host[colon - hostport] = '\0'; // Null-terminate the string
                     }
-                    port = colon + 1;
 
-                    curl_easy_setopt(curl, CURLOPT_PROXY, host);
-                    curl_easy_setopt(curl, CURLOPT_PROXYPORT, atoi(port));
+                    // Atribui o valor da porta
+                    port = (char *)malloc(strlen(colon + 1) + 1); // Aloca memória para a porta
+                    if (port) {
+                        strcpy(port, colon + 1); // Copia a string após o ':'
+                        curl_easy_setopt(curl, CURLOPT_PROXY, host);
+                        curl_easy_setopt(curl, CURLOPT_PROXYPORT, atoi(port)); // Converte para inteiro
+                        free(port); // Libera a memória de 'port' após usá-la
+                    }
                 } else {
-                    curl_easy_setopt(curl, CURLOPT_PROXY, hostport);
+                    host = (char *)malloc(strlen(hostport) + 1); // Aloca memória para o host
+                    if (host) {
+                        strcpy(host, hostport); // Copia o host
+                        curl_easy_setopt(curl, CURLOPT_PROXY, host);
+                    }
                 }
-                curl_easy_setopt(curl, CURLOPT_PROXYUSERPWD, userpwd);
+
+                // Configura as credenciais
+                if (userpwd) {
+                    curl_easy_setopt(curl, CURLOPT_PROXYUSERPWD, userpwd);
+                }
             } else {
+                // Não há credenciais, apenas o proxy sem '@'
                 curl_easy_setopt(curl, CURLOPT_PROXY, proxy);
             }
 
+            // Libera as memórias alocadas
             free(userpwd);
             free(host);
-            free(port);
             free(proxy);
         }
         #ifdef SKIP_PEER_VERIFICATION
@@ -309,6 +331,7 @@ buffer_t * http_get(char *url){
             curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
         #endif
         curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
         curl_easy_setopt(curl, CURLOPT_CA_CACHE_TIMEOUT, 604800L);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, response_data);
@@ -335,7 +358,7 @@ buffer_t * http_post(char *url, struct curl_slist * headers, cJSON *json) {
     CURL *curl = curl_easy_init();
     if(curl) {
         curl_easy_setopt(curl, CURLOPT_URL, url);
-        char *proxy = getenv("HTTP_PROXY");
+        char *proxy = getenv(HTTP_PROXY_ENV);
         if(proxy) {
             char *at = strchr(proxy, '@');
             char *userpwd = NULL;
@@ -343,63 +366,83 @@ buffer_t * http_post(char *url, struct curl_slist * headers, cJSON *json) {
             char *port = NULL;
 
             if(at) {
+                // O trecho '@' existe, separa as credenciais do proxy
                 size_t len = at - proxy;
-                userpwd = (char *)malloc(len + 1);
+                userpwd = (char *)malloc(len + 1);  // Aloca espaço para as credenciais
                 if (userpwd) {
                     strncpy(userpwd, proxy, len);
                     userpwd[len] = '\0'; // Null-terminate the string
                 }
+
+                // Pega o host e a porta após o '@'
                 char *hostport = at + 1;
-                char *colon = strchr(hostport, ':');
+                char *colon = strchr(hostport, ':'); // Verifica se há uma porta
 
                 if(colon) {
-                    host = malloc(colon - hostport + 1);
+                    // Separando o host da porta
+                    host = (char *)malloc(colon - hostport + 1);
                     if (host) {
                         strncpy(host, hostport, colon - hostport);
                         host[colon - hostport] = '\0'; // Null-terminate the string
                     }
-                    port = colon + 1;
 
-                    curl_easy_setopt(curl, CURLOPT_PROXY, host);
-                    curl_easy_setopt(curl, CURLOPT_PROXYPORT, atoi(port));
+                    // Atribui o valor da porta
+                    port = (char *)malloc(strlen(colon + 1) + 1); // Aloca memória para a porta
+                    if (port) {
+                        strcpy(port, colon + 1); // Copia a string após o ':'
+                        curl_easy_setopt(curl, CURLOPT_PROXY, host);
+                        curl_easy_setopt(curl, CURLOPT_PROXYPORT, atoi(port)); // Converte para inteiro
+                        free(port); // Libera a memória de 'port' após usá-la
+                    }
                 } else {
-                    curl_easy_setopt(curl, CURLOPT_PROXY, hostport);
+                    host = (char *)malloc(strlen(hostport) + 1); // Aloca memória para o host
+                    if (host) {
+                        strcpy(host, hostport); // Copia o host
+                        curl_easy_setopt(curl, CURLOPT_PROXY, host);
+                    }
                 }
-                curl_easy_setopt(curl, CURLOPT_PROXYUSERPWD, userpwd);
+
+                // Configura as credenciais
+                if (userpwd) {
+                    curl_easy_setopt(curl, CURLOPT_PROXYUSERPWD, userpwd);
+                }
             } else {
+                // Não há credenciais, apenas o proxy sem '@'
                 curl_easy_setopt(curl, CURLOPT_PROXY, proxy);
             }
 
-            free(userpwd);
-            free(host);
-            free(port);
-            free(proxy);
-        }
-        #ifdef SKIP_PEER_VERIFICATION
-            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-        #endif
-        #ifdef SKIP_HOSTNAME_VERIFICATION
-            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-        #endif
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+                // Libera as memórias alocadas
+                free(userpwd);
+                free(host);
+                free(proxy);
+            }
 
-        curl_easy_setopt(curl, CURLOPT_POST, 1L);
-        curl_easy_setopt(curl, CURLOPT_CA_CACHE_TIMEOUT, 604800L);
-        char * json_str = cJSON_Print(json);
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, strlen(json_str));
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_str);
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, response_data);
-        
-        CURLcode res = curl_easy_perform(curl);
-        if (res != CURLE_OK) {
-            LOGGING("curl_easy_perform() failed: %s", curl_easy_strerror(res));
+            #ifdef SKIP_PEER_VERIFICATION
+                curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+            #endif
+            #ifdef SKIP_HOSTNAME_VERIFICATION
+                curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+            #endif
+            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+            curl_easy_setopt(curl, CURLOPT_POST, 1L);
+            curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
+            curl_easy_setopt(curl, CURLOPT_CA_CACHE_TIMEOUT, 604800L);
+            char * json_str = cJSON_Print(json);
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, strlen(json_str));
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_str);
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
+            curl_easy_setopt(curl, CURLOPT_WRITEDATA, response_data);
+            
+            CURLcode res = curl_easy_perform(curl);
+            if (res != CURLE_OK) {
+                LOGGING("curl_easy_perform() failed: %s", curl_easy_strerror(res));
+            }
+            curl_easy_cleanup(curl);
         }
-        curl_easy_cleanup(curl);
+        curl_global_cleanup();
+        return response_data;
     }
-    curl_global_cleanup();
-    return response_data;
-}
 
 buffer_t * api_url_search(const char *path, const char *query) {
     int needed = snprintf(NULL, 0, "%s/search/%s?q=%s&limit=100000", API_URL, path, query);
@@ -445,9 +488,9 @@ char * search_input() {
     window_t *w = calloc(1, sizeof(window_t));
     strcpy(w->label, "Search");
     w->y = 3;
-    w->x = layout->yDiv;
-    w->starty = 1;
-    w->startx = layout->xDiv + layout->yDiv;
+    w->x = 100;
+    w->starty = (getmaxy(stdscr) / 2) - (w->y / 2);
+    w->startx = (getmaxx(stdscr) / 2) - (w->x / 2);
 
     create_win(w);
     char *track = calloc(100, sizeof(char));

@@ -2,21 +2,23 @@
 #define DZR_H
 
 #ifdef __linux__
-  #include <form.h>
-  #include <menu.h>
-  #include <ncurses.h>
-  #include <panel.h>
+  #include <formw.h>
+  #include <menuw.h>
+  #include <ncursesw.h>
+  #include <panelw.h>
 #else
-  #include <ncurses/curses.h>
-  #include <ncurses/form.h>
-  #include <ncurses/menu.h>
-  #include <ncurses/panel.h>
+  #include <ncursesw/curses.h>
+  #include <ncursesw/form.h>
+  #include <ncursesw/menu.h>
+  #include <ncursesw/panel.h>
 #endif
 
 #include <curl/curl.h>
 
 #include <stdio.h>
 #include <stdlib.h>
+
+#include <locale.h>
 
 #define STRINGFY(x) x
 
@@ -73,5 +75,6 @@ static inline void init_curses() {
   layout->yDiv = layout->yMax - 3;
   LOGGING("");
   COMMAND("");
+  setlocale(LC_ALL, "");
 }
 #endif // DZR_H
