@@ -419,7 +419,6 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
     char *input = search_input();
 
     if (!input || strlen(input) == 0) {
-        free(input);
         return 1;
     }
 
@@ -462,13 +461,6 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
     for (int i = 0; i < size; i++) {
 
         char *name_item = malloc(1);
-        if (!name_item) {
-            free(input);
-            cJSON_Delete(json);
-            free(response_data->data);
-            free(response_data);
-            return 0;
-        }
 
         cJSON *c_item = cJSON_GetArrayItem(data, i);
         if (!c_item) {
@@ -476,7 +468,6 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
             cJSON_Delete(json);
             free(response_data->data);
             free(response_data);
-            free(name_item);
             return 0;
         }
         if (cJSON_HasObjectItem(c_item, "artist")) {
@@ -486,7 +477,6 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
-                free(name_item);
                 return 0;
             }
             if (cJSON_HasObjectItem(c_artist, "name")) {
@@ -496,7 +486,6 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                     cJSON_Delete(json);
                     free(response_data->data);
                     free(response_data);
-                    free(name_item);
                     return 0;
                 }
                 char *artist_name = cJSON_GetStringValue(c_name);
@@ -505,16 +494,14 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                     cJSON_Delete(json);
                     free(response_data->data);
                     free(response_data);
-                    free(name_item);
                     return 0;
                 }
-                void *tmp = realloc(name_item, strlen(artist_name) * sizeof(char) + (4 * sizeof(char)));
+                void *tmp = realloc(name_item, (strlen(artist_name) * sizeof(char)) + (3 * sizeof(char)));
                 if (!tmp) {
                     free(input);
                     cJSON_Delete(json);
                     free(response_data->data);
                     free(response_data);
-                    free(name_item);
                     return 0;
                 }
                 name_item = tmp;
@@ -529,7 +516,6 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
-                free(name_item);
                 return 0;
             }
             char *title = cJSON_GetStringValue(c_title);
@@ -538,16 +524,14 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
-                free(name_item);
                 return 0;
             }
-            void *tmp = realloc(name_item, strlen(title) * sizeof(char));
+            void *tmp = realloc(name_item,  (strlen(title) * sizeof(char)) + (3 * sizeof(char)));
             if (!tmp) {
                 free(input);
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
-                free(name_item);
                 return 0;
             }
             name_item = tmp;
@@ -561,7 +545,6 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
-                free(name_item);
                 return 0;
             }
             int nb_tracks = (int)cJSON_GetNumberValue(c_nb_tracks);
@@ -571,7 +554,6 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
-                free(name_item);
                 return 0;
             }
             void *tmp = realloc(name_item, strlen(nb_tracks_str) * sizeof(char));
@@ -580,13 +562,10 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
-                free(name_item);
-                free(nb_tracks_str);
                 return 0;
             }
             name_item = tmp;
             strcat(name_item, nb_tracks_str);
-            free(nb_tracks_str);
         }
 
         cJSON *c_id = cJSON_GetObjectItem(c_item, "id");
@@ -595,7 +574,6 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
             cJSON_Delete(json);
             free(response_data->data);
             free(response_data);
-            free(name_item);
             return 0;
         }
 
@@ -605,7 +583,6 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
             cJSON_Delete(json);
             free(response_data->data);
             free(response_data);
-            free(name_item);
             return 0;
         }
         w->items[i] = new_item(name_item, id_item);
