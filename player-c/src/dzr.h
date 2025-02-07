@@ -22,16 +22,16 @@
 
 #define STRINGFY(x) x
 
-#define DEBUG 1
+#define DEBUG_MODE 1
 
-#if DEBUG
-#define LOG(fmt, ...)                                                          \
+#if DEBUG_MODE
+#define DEBUG(fmt, ...)                                                          \
   do {                                                                         \
     fprintf(stderr, "DEBUG: " fmt "\n", ##__VA_ARGS__);                        \
     fflush(stderr);                                                            \
   } while (0)
 #else
-#define LOG(fmt, ...)
+#define DEBUG(fmt, ...)
 #endif
 
 static void logging(char t, char *str, ...);
@@ -43,7 +43,7 @@ static void logging(char t, char *str, ...);
   do {                                                                         \
     if (!(x)) {                                                                \
       endwin();                                                                \
-      LOG("Unable to create window %s", #x);                                   \
+      DEBUG("Unable to create window %s", #x);                                   \
       exit(1);                                                                 \
     }                                                                          \
   } while (0);
