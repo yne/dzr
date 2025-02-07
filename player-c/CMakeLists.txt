@@ -48,7 +48,7 @@ set(SOURCES
 add_executable(dzr ${SOURCES})
 
 # Liga as bibliotecas ncursesw, curl, cJSON e menu ao executável
-target_compile_options(dzr PUBLIC -O1 -g3)
+target_compile_options(dzr PUBLIC -g3)
 MESSAGE(STATUS "Bibliotecas encontradas: ${NCURSES_LIBRARY} ${CURL_LIBRARIES} ${CJSON_LIBRARY} ${MENU_LIBRARY}")
 target_link_libraries(dzr ${NCURSES_LIBRARY} ${CURL_LIBRARIES} ${CJSON_LIBRARY} ${MENU_LIBRARY})
 add_custom_target(run exec ./build/dzr 2>"./out.log" ALL)

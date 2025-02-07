@@ -60,7 +60,7 @@ void free_window(window_t *w);
 
 char *search_input();
 
-char *int_to_string(char * format,int i);
+char *int_to_string(char *format, int i);
 
 int search_api(const char *path, window_t *w, Menu_Options_Seeting options);
 
@@ -154,28 +154,28 @@ int main(void) { // int argc, char **argv
             switch (ch) {
             case TRACK: {
                 COMMAND("track");
-                if(!search_api("track", painel_w, painel_options)){
+                if (!search_api("track", painel_w, painel_options)) {
                     DEBUG("Error searching track");
                 }
                 break;
             }
             case ARTIST: {
                 COMMAND("artist");
-                if(!search_api("artist", painel_w, painel_options)){
+                if (!search_api("artist", painel_w, painel_options)) {
                     DEBUG("Error searching track");
                 }
                 break;
             }
             case ALBUM: {
                 COMMAND("album");
-                if(!search_api("album", painel_w, painel_options)){
+                if (!search_api("album", painel_w, painel_options)) {
                     DEBUG("Error searching track");
                 }
                 break;
             }
             case PLAYLIST: {
                 COMMAND("playlist");
-                 if(!search_api("playlist", painel_w, painel_options)){
+                if (!search_api("playlist", painel_w, painel_options)) {
                     DEBUG("Error searching track");
                 }
                 break;
@@ -221,14 +221,14 @@ size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream) {
     if (!tmp) {
         DEBUG("Error reallocating memory");
         return 0;
-        }
-
-        b->data = tmp;
-        memcpy(&b->data[b->size], ptr, total_size);
-        b->size += total_size;
-        b->data[b->size] = 0;
-        return total_size;
     }
+
+    b->data = tmp;
+    memcpy(&b->data[b->size], ptr, total_size);
+    b->size += total_size;
+    b->data[b->size] = 0;
+    return total_size;
+}
 
 void curl_set_proxy(CURL *curl, char *proxy) {
     char *at = strchr(proxy, '@');
@@ -273,7 +273,7 @@ void curl_set_proxy(CURL *curl, char *proxy) {
             strcpy(port, colon + 1); // Copia a string após o ':'
             curl_easy_setopt(curl, CURLOPT_PROXY, host);
             curl_easy_setopt(curl, CURLOPT_PROXYPORT, atoi(port)); // Converte para inteiro
-            free(port); // Libera a memória de 'port' após usá-la
+            free(port);                                            // Libera a memória de 'port' após usá-la
         } else {
             host = (char *)malloc(strlen(hostport) + 1); // Aloca memória para o host
             if (!host) {
@@ -321,12 +321,12 @@ buffer_t *http_get(char *url) {
         if (proxy) {
             curl_set_proxy(curl, proxy);
         }
-        #ifdef SKIP_PEER_VERIFICATION
-            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-        #endif
-        #ifdef SKIP_HOSTNAME_VERIFICATION
-            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-        #endif
+#ifdef SKIP_PEER_VERIFICATION
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+#endif
+#ifdef SKIP_HOSTNAME_VERIFICATION
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+#endif
         curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
         curl_easy_setopt(curl, CURLOPT_CA_CACHE_TIMEOUT, 604800L);
@@ -373,12 +373,12 @@ buffer_t *http_post(char *url, struct curl_slist *headers, cJSON *json) {
             curl_set_proxy(curl, proxy);
         }
 
-        #ifdef SKIP_PEER_VERIFICATION
-            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-        #endif
-        #ifdef SKIP_HOSTNAME_VERIFICATION
-            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-        #endif
+#ifdef SKIP_PEER_VERIFICATION
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+#endif
+#ifdef SKIP_HOSTNAME_VERIFICATION
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+#endif
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
         curl_easy_setopt(curl, CURLOPT_POST, 1L);
@@ -414,44 +414,45 @@ buffer_t *http_post(char *url, struct curl_slist *headers, cJSON *json) {
     return response_data;
 }
 
-int search_api(const char * path, window_t *w, Menu_Options_Seeting options) {
-    
+int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
+
     char *input = search_input();
 
     if (!input || strlen(input) == 0) {
+        free(input);
         return 1;
     }
-    
-    if(w->items != NULL || w->menu != NULL) {
+
+    if (w->items != NULL || w->menu != NULL) {
         destroy_menu(w);
     }
-    
+
     buffer_t *response_data = api_url_search(path, input);
     if (!response_data) {
         free(input);
         return 0;
     }
-    
+
     cJSON *json = cJSON_ParseWithLength(response_data->data, response_data->size);
-    if(!json){
+    if (!json) {
         free(input);
         free(response_data->data);
         free(response_data);
         return 0;
     }
-    
+
     cJSON *data = cJSON_GetObjectItem(json, "data");
-    if(!data){
+    if (!data) {
         free(input);
         cJSON_Delete(json);
         free(response_data->data);
         free(response_data);
         return 0;
     }
-    
+
     int size = cJSON_GetArraySize(data);
     w->items = malloc(sizeof(ITEM *) * (size + 1));
-    if(!w->items){
+    if (!w->items) {
         free(input);
         cJSON_Delete(json);
         free(response_data->data);
@@ -459,49 +460,61 @@ int search_api(const char * path, window_t *w, Menu_Options_Seeting options) {
         return 0;
     }
     for (int i = 0; i < size; i++) {
-        
-        char *name_item = NULL;
 
-        cJSON *c_item = cJSON_GetArrayItem(data, i);
-        if(!c_item){
+        char *name_item = malloc(1);
+        if (!name_item) {
             free(input);
             cJSON_Delete(json);
             free(response_data->data);
             free(response_data);
             return 0;
         }
-        if(cJSON_HasObjectItem(c_item, "artist")) {
+
+        cJSON *c_item = cJSON_GetArrayItem(data, i);
+        if (!c_item) {
+            free(input);
+            cJSON_Delete(json);
+            free(response_data->data);
+            free(response_data);
+            free(name_item);
+            return 0;
+        }
+        if (cJSON_HasObjectItem(c_item, "artist")) {
             cJSON *c_artist = cJSON_GetObjectItem(c_item, "artist");
-            if(!c_artist){
+            if (!c_artist) {
                 free(input);
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
+                free(name_item);
                 return 0;
             }
-            if(cJSON_HasObjectItem(c_artist, "name")){
+            if (cJSON_HasObjectItem(c_artist, "name")) {
                 cJSON *c_name = cJSON_GetObjectItem(c_artist, "name");
-                if(!c_name){
+                if (!c_name) {
                     free(input);
                     cJSON_Delete(json);
                     free(response_data->data);
                     free(response_data);
+                    free(name_item);
                     return 0;
                 }
                 char *artist_name = cJSON_GetStringValue(c_name);
-                if(!artist_name){
+                if (!artist_name) {
                     free(input);
                     cJSON_Delete(json);
                     free(response_data->data);
                     free(response_data);
+                    free(name_item);
                     return 0;
                 }
-                void* tmp = realloc(name_item, strlen(artist_name) * sizeof(char) + (4 * sizeof(char)));
-                if(!tmp){
+                void *tmp = realloc(name_item, strlen(artist_name) * sizeof(char) + (4 * sizeof(char)));
+                if (!tmp) {
                     free(input);
                     cJSON_Delete(json);
                     free(response_data->data);
                     free(response_data);
+                    free(name_item);
                     return 0;
                 }
                 name_item = tmp;
@@ -509,89 +522,99 @@ int search_api(const char * path, window_t *w, Menu_Options_Seeting options) {
                 strcat(name_item, " - ");
             }
         }
-        if(cJSON_HasObjectItem(c_item, "title")) {
+        if (cJSON_HasObjectItem(c_item, "title")) {
             cJSON *c_title = cJSON_GetObjectItem(c_item, "title");
-            if(!c_title){
+            if (!c_title) {
                 free(input);
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
+                free(name_item);
                 return 0;
             }
             char *title = cJSON_GetStringValue(c_title);
-            if(!title){
+            if (!title) {
                 free(input);
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
+                free(name_item);
                 return 0;
             }
-            void* tmp = realloc(name_item, strlen(title) * sizeof(char));
-            if(!tmp){
+            void *tmp = realloc(name_item, strlen(title) * sizeof(char));
+            if (!tmp) {
                 free(input);
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
+                free(name_item);
                 return 0;
             }
             name_item = tmp;
             strcat(name_item, title);
             strcat(name_item, " - ");
         }
-        if(cJSON_HasObjectItem(c_item, "nb_tracks")) {
+        if (cJSON_HasObjectItem(c_item, "nb_tracks")) {
             cJSON *c_nb_tracks = cJSON_GetObjectItem(c_item, "nb_tracks");
-            if(!c_nb_tracks){
+            if (!c_nb_tracks) {
                 free(input);
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
+                free(name_item);
                 return 0;
             }
-            int nb_tracks = (int) cJSON_GetNumberValue(c_nb_tracks);
-            char *nb_tracks_str = int_to_string(" (%i)", nb_tracks);
-            if(!nb_tracks_str){
+            int nb_tracks = (int)cJSON_GetNumberValue(c_nb_tracks);
+            char *nb_tracks_str = int_to_string(" (%d)", nb_tracks);
+            if (!nb_tracks_str) {
                 free(input);
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
+                free(name_item);
                 return 0;
             }
-            void* tmp = realloc(name_item, strlen(nb_tracks_str) * sizeof(char));
-            if(!tmp){
+            void *tmp = realloc(name_item, strlen(nb_tracks_str) * sizeof(char));
+            if (!tmp) {
                 free(input);
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
+                free(name_item);
+                free(nb_tracks_str);
                 return 0;
             }
             name_item = tmp;
             strcat(name_item, nb_tracks_str);
+            free(nb_tracks_str);
         }
 
         cJSON *c_id = cJSON_GetObjectItem(c_item, "id");
-        if(!c_id){
+        if (!c_id) {
             free(input);
             cJSON_Delete(json);
             free(response_data->data);
             free(response_data);
+            free(name_item);
             return 0;
         }
 
-        char * id_item = int_to_string(NULL, (int) cJSON_GetNumberValue(c_id));
-        if(!id_item){
+        char *id_item = int_to_string(NULL, (int)cJSON_GetNumberValue(c_id));
+        if (!id_item) {
             free(input);
             cJSON_Delete(json);
             free(response_data->data);
             free(response_data);
+            free(name_item);
             return 0;
         }
         w->items[i] = new_item(name_item, id_item);
     }
-    
+
     w->items[size] = NULL;
 
     create_menu(w, options);
-    
+
     free(input);
     cJSON_Delete(json);
     free(response_data->data);
@@ -599,18 +622,10 @@ int search_api(const char * path, window_t *w, Menu_Options_Seeting options) {
     return 1;
 }
 
-char *int_to_string(char* format, int i) {
-    if(format == NULL){
-        format = "%d";
-    }
-    int needed = snprintf(NULL, 0, format, i);
-    char *str = malloc(needed + 1);
-    if (str) {
-        snprintf(str, needed + 1, format, i);
-    } else {
-        DEBUG("Error allocating memory for int_to_string");
-    }
-    return str;
+char *int_to_string(char *format, int i) {
+    char *str = calloc(10, sizeof(char));
+    sprintf(str, format ? format : "%d", i);
+    return (char *)str;
 }
 
 buffer_t *api_url_search(const char *path, const char *query) {
@@ -799,7 +814,7 @@ void create_menu(window_t *w, Menu_Options_Seeting options) {
         DEBUG("Invalid parameters in create_menu");
         return;
     }
-    DEBUG("%p", (void *) *((&w->items + 1) - 1));
+    DEBUG("%p", (void *)*((&w->items + 1) - 1));
     w->menu = new_menu((ITEM **)w->items);
     if (w->menu == NULL) {
         DEBUG("Error creating new menu");
@@ -916,4 +931,3 @@ static void logging(char t, char *str, ...) {
     refresh();
     DEBUG("%s", buffer);
 }
-
