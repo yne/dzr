@@ -17,38 +17,43 @@ include_directories(src)
 # Busca as bibliotecas ncursesw e curl
 find_package(CURL REQUIRED)
 
+if(MSYS)
+    find_library(NCURSES_LIBRARY NAMES ncursesw PATHS /usr/lib /usr/local/lib)
+    find_library(MENU_LIBRARY NAMES menuw)
+    find_library(PANEL_LIBRARY NAMES panelw)
+else()
+    find_package(Curses REQUIRED)
+    
+    find_library(NCURSES_LIBRARY NAMES ncursesw PATHS /usr/lib /usr/local/lib)
+    find_library(MENU_LIBRARY NAMES menuw)
+    find_library(PANEL_LIBRARY NAMES panelw)
+
+    include_directories(${CURSES_INCLUDE_DIR})
+endif()
 # Busca explicitamente a biblioteca ncursesw e menu no Linux
-find_library(NCURSES_LIBRARY NAMES ncursesw PATHS /usr/lib /usr/local/lib)
-find_library(MENU_LIBRARY NAMES menuw)
 
 # Busca manualmente os arquivos de cabeçalho e a biblioteca do cJSON
 find_path(CJSON_INCLUDE_DIR cjson/cJSON.h PATHS /usr/include /usr/local/include)
 find_library(CJSON_LIBRARY NAMES cjson PATHS /usr/lib /usr/local/lib)
 
-# Se não encontrar, mostra erro
-if (NOT CJSON_INCLUDE_DIR OR NOT CJSON_LIBRARY)
-    message(FATAL_ERROR "cJSON não encontrado! Instale a biblioteca (ex: sudo apt install libcjson-dev).")
-endif()
-
 # Adiciona os diretórios de inclusão do cJSON
 include_directories(${CJSON_INCLUDE_DIR})
 
 
-# Se não encontrar a ncursesw, mostra erro
-if (NOT NCURSES_LIBRARY)
-    message(FATAL_ERROR "ncursesw não encontrado! Instale a biblioteca (ex: sudo apt install libncursesw5-dev).")
-endif()
-
 # Lista os arquivos de código-fonte dentro de src/
-set(SOURCES
-    src/dzr.c
-)
+file(GLOB SOURCES src/*.c)
+
+message(STATUS "Arquivos encontrados: ${SOURCES}")
 
 # Cria o executável com os arquivos fonte
 add_executable(dzr ${SOURCES})
 
+
 # Liga as bibliotecas ncursesw, curl, cJSON e menu ao executável
 target_compile_options(dzr PUBLIC -g3)
-MESSAGE(STATUS "Bibliotecas encontradas: ${NCURSES_LIBRARY} ${CURL_LIBRARIES} ${CJSON_LIBRARY} ${MENU_LIBRARY}")
-target_link_libraries(dzr ${NCURSES_LIBRARY} ${CURL_LIBRARIES} ${CJSON_LIBRARY} ${MENU_LIBRARY})
+
+# Adiciona as bibliotecas ncursesw, curl, cJSON e menu ao executável
+set(LIBRARIES ${NCURSES_LIBRARY} ${CURL_LIBRARIES} ${CJSON_LIBRARY} ${MENU_LIBRARY} ${PANEL_LIBRARY})
+MESSAGE(STATUS "Bibliotecas encontradas: ${LIBRARIES}")
+target_link_libraries(dzr ${LIBRARIES})
 add_custom_target(run exec ./build/dzr 2>"./out.log" ALL)

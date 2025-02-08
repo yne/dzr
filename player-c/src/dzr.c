@@ -1,13 +1,9 @@
 #include "dzr.h"
-#include <cjson/cJSON.h>
+#include "requests.h"
+
 #include <string.h>
 #include <wchar.h>
 
-#define HTTP_PROXY_ENV "HTTP_PROXY_O"
-
-#define API_URL "https://api.deezer.com"
-#define GW_URL "https://www.deezer.com/ajax/gw-light.php"
-#define MEDIA_URL "https://media.deezer.com/v1/get_url"
 
 enum Commands {
     CTRL_D = 4,
@@ -30,23 +26,10 @@ enum Commands {
     RADIO = 'r'
 };
 
-struct window_t {
-    WINDOW *window;
-    MENU *menu;
-    ITEM **items;
-    int y;
-    int x;
-    int starty;
-    int startx;
-    char label[15];
-};
-
 typedef struct {
     Menu_Options on;
     Menu_Options off;
 } Menu_Options_Seeting;
-
-void create_win(window_t *w);
 
 void create_menu(window_t *w, Menu_Options_Seeting options);
 
@@ -56,23 +39,19 @@ void drive_menu(window_t *w, int key);
 
 void addLabel(WINDOW *win, char *str);
 
-void free_window(window_t *w);
-
 char *search_input();
 
 char *int_to_string(char *format, int i);
 
 int search_api(const char *path, window_t *w, Menu_Options_Seeting options);
 
-buffer_t *api_url_search(const char *path, const char *query);
+void create_win(window_t *w);
+void free_window(window_t *w);
+void clear_and_write(window_t *w, char *str);
 
-buffer_t *api_url_id(const char *path, const char *id);
-
-buffer_t *http_get(char *url);
-
-buffer_t *http_post(char *url, struct curl_slist *headers, cJSON *json);
 
 // https://pubs.opengroup.org/onlinepubs/7908799/xcurses/intovix.html
+// http://graysoftinc.com/terminal-tricks/curses-windows-pads-and-panels
 
 int main(void) { // int argc, char **argv
 
@@ -87,17 +66,17 @@ int main(void) { // int argc, char **argv
 
     window_t *playlist_w = calloc(1, sizeof(window_t));
     strcpy(playlist_w->label, "Playlist");
-    playlist_w->y = layout->yMax - 3;
-    playlist_w->x = layout->xDiv;
+    playlist_w->y = yMax() - 1;
+    playlist_w->x = xDiv();
     playlist_w->starty = 0;
     playlist_w->startx = 0;
-
+    
     window_t *painel_w = calloc(1, sizeof(window_t));
     strcpy(painel_w->label, "Painel");
-    painel_w->y = layout->yDiv;
-    painel_w->x = layout->xMax - layout->xDiv;
+    painel_w->y = yMax() - 1;
+    painel_w->x = xMax() - xDiv();
     painel_w->starty = 0;
-    painel_w->startx = layout->xDiv;
+    painel_w->startx = xDiv();
 
     create_win(playlist_w);
 
@@ -105,93 +84,93 @@ int main(void) { // int argc, char **argv
 
     int ch;
     while ((ch = getch()) != CTRL_D) {
-        LOGGING("key: %d char: %c", ch, ch);
+        DEBUG("key: %d char: %c", ch, ch);
         switch (ch) {
         case UP: {
-            COMMAND("up");
+            DEBUG("up");
             drive_menu(painel_w, REQ_UP_ITEM);
             break;
         }
         case DOWN: {
-            COMMAND("down");
+            DEBUG("down");
             drive_menu(painel_w, REQ_DOWN_ITEM);
             break;
         }
         case PAGE_UP: {
-            COMMAND("previous page");
+            DEBUG("previous page");
             drive_menu(painel_w, REQ_SCR_DPAGE);
             break;
         }
         case PAGE_DOWN: {
-            COMMAND("next page");
+            DEBUG("next page");
             drive_menu(painel_w, REQ_SCR_UPAGE);
             break;
         }
         case LEFT: {
-            COMMAND("left");
+            DEBUG("left");
             break;
         }
         case RIGHT: {
-            COMMAND("right");
+            DEBUG("right");
             break;
         }
         case SELECT: {
-            COMMAND("backspace");
+            DEBUG("backspace");
             ITEM *it = current_item(painel_w->menu);
             int index = item_index(it);
-            LOGGING("selecting item %d", index);
+            DEBUG("selecting item %d", index);
             menu_driver(painel_w->menu, REQ_TOGGLE_ITEM);
             break;
         }
         case KEY_F(1): {
-            COMMAND("f1");
+            DEBUG("f1");
 
             break;
         }
         case COMMAND: {
-            COMMAND("command");
+            DEBUG("command");
             ch = getch();
             switch (ch) {
             case TRACK: {
-                COMMAND("track");
+                DEBUG("track");
                 if (!search_api("track", painel_w, painel_options)) {
                     DEBUG("Error searching track");
                 }
                 break;
             }
             case ARTIST: {
-                COMMAND("artist");
+                DEBUG("artist");
                 if (!search_api("artist", painel_w, painel_options)) {
                     DEBUG("Error searching track");
                 }
                 break;
             }
             case ALBUM: {
-                COMMAND("album");
+                DEBUG("album");
                 if (!search_api("album", painel_w, painel_options)) {
                     DEBUG("Error searching track");
                 }
                 break;
             }
             case PLAYLIST: {
-                COMMAND("playlist");
+                DEBUG("playlist");
                 if (!search_api("playlist", painel_w, painel_options)) {
                     DEBUG("Error searching track");
                 }
                 break;
             }
             case USER: {
-                COMMAND("user");
+                DEBUG("user");
                 DEBUG("Not implemented");
                 break;
             }
             case RADIO: {
-                COMMAND("radio");
+                DEBUG("radio");
                 DEBUG("Not implemented");
                 break;
             }
             default: {
-                COMMAND("invalid");
+                DEBUG("invalid");
                 break;
             }
             }
@@ -202,216 +181,14 @@ int main(void) { // int argc, char **argv
         }
     }
 
-    LOGGING("exiting ...");
+    DEBUG("exiting ...");
 
     free_window(playlist_w);
     free_window(painel_w);
 
-    logging('0', NULL);
-
     endwin();
     exit(0);
     return 0;
-}
-
-size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream) {
-    size_t total_size = size * nmemb;
-    buffer_t *b = (buffer_t *)stream;
-    char *tmp = realloc(b->data, b->size + total_size + 1);
-    if (!tmp) {
-        DEBUG("Error reallocating memory");
-        return 0;
-    }
-
-    b->data = tmp;
-    memcpy(&b->data[b->size], ptr, total_size);
-    b->size += total_size;
-    b->data[b->size] = 0;
-    return total_size;
-}
-
-void curl_set_proxy(CURL *curl, char *proxy) {
-    char *at = strchr(proxy, '@');
-    char *userpwd = NULL;
-    char *host = NULL;
-    char *port = NULL;
-
-    if (at) {
-        // O trecho '@' existe, separa as credenciais do proxy
-        size_t len = at - proxy;
-        userpwd = (char *)malloc(len + 1); // Aloca espaço para as credenciais
-        if (!userpwd) {
-            DEBUG("Error allocating memory for userpwd");
-            return;
-        }
-        strncpy(userpwd, proxy, len);
-        userpwd[len] = '\0'; // Null-terminate the string
-
-        // Pega o host e a porta após o '@'
-        char *hostport = at + 1;
-        char *colon = strchr(hostport, ':'); // Verifica se há uma porta
-
-        if (colon) {
-            // Separando o host da porta
-            host = (char *)malloc(colon - hostport + 1);
-            if (!host) {
-                DEBUG("Error allocating memory for host");
-                free(userpwd);
-                return;
-            }
-            strncpy(host, hostport, colon - hostport);
-            host[colon - hostport] = '\0'; // Null-terminate the string
-
-            // Atribui o valor da porta
-            port = (char *)malloc(strlen(colon + 1) + 1); // Aloca memória para a porta
-            if (!port) {
-                DEBUG("Error allocating memory for port");
-                free(userpwd);
-                free(host);
-                return;
-            }
-            strcpy(port, colon + 1); // Copia a string após o ':'
-            curl_easy_setopt(curl, CURLOPT_PROXY, host);
-            curl_easy_setopt(curl, CURLOPT_PROXYPORT, atoi(port)); // Converte para inteiro
-            free(port);                                            // Libera a memória de 'port' após usá-la
-        } else {
-            host = (char *)malloc(strlen(hostport) + 1); // Aloca memória para o host
-            if (!host) {
-                DEBUG("Error allocating memory for host");
-                free(userpwd);
-                return;
-            }
-            strcpy(host, hostport); // Copia o host
-            curl_easy_setopt(curl, CURLOPT_PROXY, host);
-        }
-
-        // Configura as credenciais
-        curl_easy_setopt(curl, CURLOPT_PROXYUSERPWD, userpwd);
-    } else {
-        // Não há credenciais, apenas o proxy sem '@'
-        curl_easy_setopt(curl, CURLOPT_PROXY, proxy);
-    }
-
-    // Libera as memórias alocadas
-    free(userpwd);
-    free(host);
-}
-
-buffer_t *http_get(char *url) {
-
-    buffer_t *response_data = malloc(sizeof(buffer_t));
-    if (!response_data) {
-        DEBUG("Error allocating memory for response_data");
-        return NULL;
-    }
-    response_data->data = malloc(1);
-    if (!response_data->data) {
-        DEBUG("Error allocating memory for response_data->data");
-        free(response_data);
-        return NULL;
-    }
-    response_data->size = 0;
-
-    curl_global_init(CURL_GLOBAL_ALL);
-    CURL *curl = curl_easy_init();
-    if (curl) {
-        curl_easy_setopt(curl, CURLOPT_URL, url);
-
-        char *proxy = getenv(HTTP_PROXY_ENV);
-        if (proxy) {
-            curl_set_proxy(curl, proxy);
-        }
-#ifdef SKIP_PEER_VERIFICATION
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-#endif
-#ifdef SKIP_HOSTNAME_VERIFICATION
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-#endif
-        curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
-        curl_easy_setopt(curl, CURLOPT_CA_CACHE_TIMEOUT, 604800L);
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, response_data);
-        CURLcode res = curl_easy_perform(curl);
-
-        if (res != CURLE_OK) {
-            DEBUG("curl_easy_perform() on URL %s failed: %s", url, curl_easy_strerror(res));
-        }
-
-        curl_easy_cleanup(curl);
-    } else {
-        DEBUG("Error initializing CURL");
-        free(response_data->data);
-        free(response_data);
-        response_data = NULL;
-    }
-    curl_global_cleanup();
-    return response_data;
-}
-
-buffer_t *http_post(char *url, struct curl_slist *headers, cJSON *json) {
-
-    buffer_t *response_data = malloc(sizeof(buffer_t));
-    if (!response_data) {
-        DEBUG("Error allocating memory for response_data");
-        return NULL;
-    }
-    response_data->data = malloc(1);
-    if (!response_data->data) {
-        DEBUG("Error allocating memory for response_data->data");
-        free(response_data);
-        return NULL;
-    }
-    response_data->size = 0;
-
-    curl_global_init(CURL_GLOBAL_ALL);
-    CURL *curl = curl_easy_init();
-    if (curl) {
-        curl_easy_setopt(curl, CURLOPT_URL, url);
-        char *proxy = getenv(HTTP_PROXY_ENV);
-        if (proxy) {
-            curl_set_proxy(curl, proxy);
-        }
-
-#ifdef SKIP_PEER_VERIFICATION
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-#endif
-#ifdef SKIP_HOSTNAME_VERIFICATION
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-#endif
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-        curl_easy_setopt(curl, CURLOPT_POST, 1L);
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
-        curl_easy_setopt(curl, CURLOPT_CA_CACHE_TIMEOUT, 604800L);
-        char *json_str = cJSON_Print(json);
-        if (!json_str) {
-            DEBUG("Error printing JSON");
-            free(response_data->data);
-            free(response_data);
-            curl_easy_cleanup(curl);
-            curl_global_cleanup();
-            return NULL;
-        }
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, strlen(json_str));
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_str);
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, response_data);
-
-        CURLcode res = curl_easy_perform(curl);
-        if (res != CURLE_OK) {
-            DEBUG("curl_easy_perform() failed: %s", curl_easy_strerror(res));
-        }
-        free(json_str);
-        curl_easy_cleanup(curl);
-    } else {
-        DEBUG("Error initializing CURL");
-        free(response_data->data);
-        free(response_data);
-        response_data = NULL;
-    }
-    curl_global_cleanup();
-    return response_data;
 }
 
 int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
@@ -603,35 +380,6 @@ char *int_to_string(char *format, int i) {
     char *str = calloc(10, sizeof(char));
     sprintf(str, format ? format : "%d", i);
     return (char *)str;
-}
-
-buffer_t *api_url_search(const char *path, const char *query) {
-    char *encoded_query = curl_easy_escape(NULL, query, strlen(query));
-    int needed = snprintf(NULL, 0, "%s/search/%s?q=%s&limit=100000", API_URL, path, encoded_query);
-    char *url = malloc(needed + 1);
-    buffer_t *result = NULL;
-    if (url) {
-        snprintf(url, needed + 1, "%s/search/%s?q=%s&limit=100000", API_URL, path, encoded_query);
-        result = http_get(url);
-        free(url);
-    } else {
-        DEBUG("Error allocating memory for url");
-    }
-    return result;
-}
-
-buffer_t *api_url_id(const char *path, const char *id) {
-    int needed = snprintf(NULL, 0, "%s/%s/%s", API_URL, path, id);
-    char *url = malloc(needed + 1);
-    buffer_t *result = NULL;
-    if (url) {
-        snprintf(url, needed + 1, "%s/%s/%s", API_URL, path, id);
-        result = http_get(url);
-        free(url);
-    } else {
-        DEBUG("Error allocating memory for url");
-    }
-    return result;
 }
 
 void clear_and_write(window_t *w, char *str) {
@@ -837,74 +585,4 @@ void free_window(window_t *w) {
         }
         free(w);
     }
-}
-
-static void logging(char t, char *str, ...) {
-    static window_t *logging = NULL;
-
-    static window_t *command = NULL;
-
-    if (str == NULL) {
-        if (logging != NULL) {
-            free_window(logging);
-            logging = NULL;
-            DEBUG("Destroyed logging window\n");
-        }
-        if (command != NULL) {
-            free_window(command);
-            command = NULL;
-            DEBUG("Destroyed command window\n");
-        }
-        return;
-    }
-
-    if (logging == NULL) {
-        logging = calloc(1, sizeof(window_t));
-        if (logging == NULL) {
-            DEBUG("Unable to allocate memory for logging window\n");
-            return;
-        }
-        strcpy(logging->label, "Logging");
-        logging->y = layout->yMax - layout->yDiv;
-        logging->x = layout->xMax - layout->xDiv;
-        logging->starty = layout->yDiv;
-        logging->startx = layout->xDiv;
-    }
-
-    if (command == NULL) {
-        command = calloc(1, sizeof(window_t));
-        if (command == NULL) {
-            DEBUG("Unable to allocate memory for command window\n");
-            return;
-        }
-        strcpy(command->label, "Command");
-        command->y = layout->yMax - layout->yDiv;
-        command->x = layout->xDiv;
-        command->starty = layout->yDiv;
-        command->startx = 0;
-    }
-
-    va_list args;
-    va_start(args, str);
-
-    char buffer[256];
-    vsnprintf(buffer, sizeof(buffer), str, args);
-    va_end(args);
-    if (t == 'C') {
-        if (command->window == NULL) {
-            create_win(command);
-            DEBUG("Created command window\n");
-        }
-        clear_and_write(command, buffer);
-    }
-    if (t == 'L') {
-        if (logging->window == NULL) {
-            create_win(logging);
-            DEBUG("Created logging window\n");
-        }
-        clear_and_write(logging, buffer);
-    }
-
-    refresh();
-    DEBUG("%s", buffer);
 }
