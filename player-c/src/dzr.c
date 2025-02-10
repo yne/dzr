@@ -96,11 +96,6 @@ int main(void) { // int argc, char **argv
     painel_w->starty = 0;
     painel_w->startx = playlist_w->x;
 
-    if(refresh() != OK){
-        DEBUG("Error refreshing screen");
-        goto exit;
-    }
-
     if(create_win(playlist_w) != OK){
         DEBUG("Error creating playlist window");
         goto exit;
@@ -110,7 +105,10 @@ int main(void) { // int argc, char **argv
         DEBUG("Error creating painel window");
         goto exit;
     }
-    
+
+    refresh();
+    doupdate();
+
     int ch;
     while ((ch = getch()) != CTRL_D) {
         
@@ -163,6 +161,7 @@ int main(void) { // int argc, char **argv
                 switch (ch) {
                     case TRACK: {
                         DEBUG("track");
+                        refresh();
                         if (!search_api("track", painel_w, painel_options)) {
                             DEBUG("Error searching track");
                         }
@@ -211,6 +210,8 @@ int main(void) { // int argc, char **argv
             default:
                 break;
         }
+        refresh();
+        doupdate();
     }
 
     exit:
@@ -230,7 +231,7 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
     char *input = search_input(path);
 
     if (!input || strlen(input) == 0) {
-        return 1;
+        return OK;
     }
 
     if (w->items != NULL || w->menu != NULL) {
@@ -240,7 +241,7 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
     buffer_t *response_data = api_url_search(path, input);
     if (!response_data) {
         free(input);
-        return 0;
+        return ERR;
     }
 
     cJSON *json = cJSON_ParseWithLength(response_data->data, response_data->size);
@@ -248,7 +249,7 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
         free(input);
         free(response_data->data);
         free(response_data);
-        return 0;
+        return ERR;
     }
 
     cJSON *data = cJSON_GetObjectItem(json, "data");
@@ -257,7 +258,7 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
         cJSON_Delete(json);
         free(response_data->data);
         free(response_data);
-        return 0;
+        return ERR;
     }
 
     int size = cJSON_GetArraySize(data);
@@ -267,12 +268,20 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
         cJSON_Delete(json);
         free(response_data->data);
         free(response_data);
-        return 0;
+        return ERR;
     }
     
     for (int i = 0; i < size; i++) {
 
-        char *name_item = malloc(1);
+        char ** names = calloc(3, sizeof(char *));
+        int len = 0;
+        if(!names){
+            free(input);
+            cJSON_Delete(json);
+            free(response_data->data);
+            free(response_data);
+            return ERR;
+        }
 
         cJSON *c_item = cJSON_GetArrayItem(data, i);
         if (!c_item) {
@@ -280,7 +289,7 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
             cJSON_Delete(json);
             free(response_data->data);
             free(response_data);
-            return 0;
+            return ERR;
         }
         if (cJSON_HasObjectItem(c_item, "artist")) {
             cJSON *c_artist = cJSON_GetObjectItem(c_item, "artist");
@@ -289,7 +298,7 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
-                return 0;
+                return ERR;
             }
             if (cJSON_HasObjectItem(c_artist, "name")) {
                 cJSON *c_name = cJSON_GetObjectItem(c_artist, "name");
@@ -298,7 +307,7 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                     cJSON_Delete(json);
                     free(response_data->data);
                     free(response_data);
-                    return 0;
+                    return ERR;
                 }
                 char *artist_name = cJSON_GetStringValue(c_name);
                 if (!artist_name) {
@@ -306,19 +315,10 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                     cJSON_Delete(json);
                     free(response_data->data);
                     free(response_data);
-                    return 0;
+                    return ERR;
                 }
-                void *tmp = realloc(name_item, (strlen(artist_name) * sizeof(char)) + (3 * sizeof(char)));
-                if (!tmp) {
-                    free(input);
-                    cJSON_Delete(json);
-                    free(response_data->data);
-                    free(response_data);
-                    return 0;
-                }
-                name_item = tmp;
-                strcat(name_item, artist_name);
-                strcat(name_item, " - ");
+                names[0] = artist_name;
+                len += strlen(artist_name); 
             }
         }
         if (cJSON_HasObjectItem(c_item, "title")) {
@@ -328,7 +328,7 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
-                return 0;
+                return ERR;
             }
             char *title = cJSON_GetStringValue(c_title);
             if (!title) {
@@ -336,19 +336,10 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
-                return 0;
+                return ERR;
             }
-            void *tmp = realloc(name_item,  (strlen(title) * sizeof(char)) + (3 * sizeof(char)));
-            if (!tmp) {
-                free(input);
-                cJSON_Delete(json);
-                free(response_data->data);
-                free(response_data);
-                return 0;
-            }
-            name_item = tmp;
-            strcat(name_item, title);
-            strcat(name_item, " - ");
+            names[1] = title;
+            len += strlen(title);
         }
         if (cJSON_HasObjectItem(c_item, "nb_tracks")) {
             cJSON *c_nb_tracks = cJSON_GetObjectItem(c_item, "nb_tracks");
@@ -357,7 +348,7 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
-                return 0;
+                return ERR;
             }
             int nb_tracks = (int)cJSON_GetNumberValue(c_nb_tracks);
             char *nb_tracks_str = int_to_string(" (%d)", nb_tracks);
@@ -366,18 +357,10 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
-                return 0;
+                return ERR;
             }
-            void *tmp = realloc(name_item, strlen(nb_tracks_str) * sizeof(char));
-            if (!tmp) {
-                free(input);
-                cJSON_Delete(json);
-                free(response_data->data);
-                free(response_data);
-                return 0;
-            }
-            name_item = tmp;
-            strcat(name_item, nb_tracks_str);
+            names[2] = nb_tracks_str;
+            len += strlen(nb_tracks_str);
         }
 
         cJSON *c_id = cJSON_GetObjectItem(c_item, "id");
@@ -386,7 +369,7 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
             cJSON_Delete(json);
             free(response_data->data);
             free(response_data);
-            return 0;
+            return ERR;
         }
 
         char *id_item = int_to_string(NULL, (int)cJSON_GetNumberValue(c_id));
@@ -395,13 +378,27 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
             cJSON_Delete(json);
             free(response_data->data);
             free(response_data);
-            return 0;
+            return ERR;
         }
+
+        char * name_item = calloc(len + 5, sizeof(char));
+
+        if(names[0] && names[1]){ // Artist - Title
+            strcat(name_item, names[0]);
+            strcat(name_item, " - ");
+            strcat(name_item, names[1]);
+        }
+        if(names[1] && names[2]){ // Title (nb_tracks)
+            strcat(name_item, names[1]);
+            strcat(name_item, " - ");
+            strcat(name_item, names[2]);
+        }
+     
         w->items[i] = new_item(name_item, id_item);
     }
 
     w->items[size] = NULL;
-
+    
     create_menu(w, options);
 
     free(input);
@@ -438,15 +435,10 @@ int clear_and_write(window_t *w, char *str) {
     }
 
     if(str && strlen(str) > 0){
-        if (mvwaddstr(w->window, 1, 3, str) == OK) {
+        if (mvwaddstr(w->window, 1, 3, str) != OK) {
             DEBUG("Error adding string in clear_and_write");
             return ERR;
         }
-    }
-
-    if (wrefresh(w->window) != OK) {
-        DEBUG("Error refreshing window in clear_and_write");
-        return ERR;
     }
     return OK;
 }
@@ -465,7 +457,11 @@ char *search_input(const char * label) {
     w->starty = (getmaxy(stdscr) / 2) - (w->y / 2);
     w->startx = (getmaxx(stdscr) / 2) - (w->x / 2);
 
-    create_win(w);
+    if(create_win(w) != OK){
+        DEBUG("Error creating search window");
+        free(w);
+        return NULL;
+    }
 
     char *track = malloc(1);
     if (!track) {
@@ -506,13 +502,16 @@ char *search_input(const char * label) {
         }
     }
 
-    wclear(w->window);
-    if (wrefresh(w->window) == ERR) {
-        DEBUG("Error refreshing search window");
+    if(wclear(w->window) != OK){
+        DEBUG("Error clearing search window");
     }
-    delwin(w->window);
+    if(delwin(w->window) != OK){
+        DEBUG("Error deleting search window");
+    }
+    if(wrefresh(w->window) != OK){
+        DEBUG("Error refreshing screen in search_input");
+    }
     free(w);
-
     return track;
 }
 
@@ -529,11 +528,7 @@ int create_win(window_t *w) {
     if(addLabel(w->window, w->label) != OK){
         DEBUG("Error adding label in create_win");
         return ERR;
-    };
-    if(wrefresh(w->window) != OK){
-        DEBUG("Error refreshing window in create_win");
-        return ERR;
-    };
+    }
     return OK;
 }
 
@@ -554,11 +549,6 @@ int addLabel(WINDOW *win, char *str) {
     int x = getmaxx(win) * 0.10;
     if (mvwaddstr(win, 0, x, nstr) != OK) {
         DEBUG("Error adding string in addLabel");
-        free(nstr);
-        return ERR;
-    }
-    if (wrefresh(win) != OK) {
-        DEBUG("Error refreshing window in addLabel");
         free(nstr);
         return ERR;
     }
@@ -621,11 +611,6 @@ int create_menu(window_t *w, Menu_Options_Seeting options) {
         w->menu = NULL;
         return ERR;
     }
-
-    if (wrefresh(w->window) == ERR) {
-        DEBUG("Error refreshing window in create_menu");
-        return ERR;
-    }
     return OK;
 }
 
@@ -638,24 +623,20 @@ int drive_menu(window_t *w, int key) {
         DEBUG("Error driving menu");
         return ERR;
     }
-    if(wrefresh(w->window) != OK){
-        DEBUG("Error refreshing window in drive_menu");
-        return ERR;
-    }
     return OK;
 }
 
 int free_window(window_t *w) {
     if (w != NULL) {
-        if (w->window != NULL) {
-            if(delwin(w->window) != OK){
-                DEBUG("Error deleting window");
-                return ERR;
-            }
-        }
         if (w->menu != NULL) {
             if(destroy_menu(w) != OK){
                 DEBUG("Error destroying menu");
+                return ERR;
+            }
+        }
+        if (w->window != NULL) {
+            if(delwin(w->window) != OK){
+                DEBUG("Error deleting window");
                 return ERR;
             }
         }

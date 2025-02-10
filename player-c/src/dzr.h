@@ -7,7 +7,6 @@
   #include <panel.h>
 #else
   #include <ncursesw/curses.h>
-  #include <ncursesw/form.h>
   #include <ncursesw/menu.h>
   #include <ncursesw/panel.h>
 #endif
