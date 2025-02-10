@@ -3,8 +3,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-
-
 size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream) {
     size_t total_size = size * nmemb;
     buffer_t *b = (buffer_t *)stream;
