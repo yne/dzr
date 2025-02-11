@@ -21,6 +21,7 @@
 
 typedef struct window_t {
   WINDOW *window;
+  PANEL *panel;
   MENU *menu;
   ITEM **items;
   int y;

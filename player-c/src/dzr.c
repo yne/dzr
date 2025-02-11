@@ -56,7 +56,7 @@ int clear_and_write(window_t *w, char *str);
 int main(void) { // int argc, char **argv
 
     init_curses();
-
+    
     int yMax = getmaxy(stdscr);
     int xMax = getmaxx(stdscr);
 
@@ -105,8 +105,10 @@ int main(void) { // int argc, char **argv
         DEBUG("Error creating painel window");
         goto exit;
     }
+    
+    search_input("INIT");
 
-    refresh();
+    update_panels();
     doupdate();
 
     int ch;
@@ -161,7 +163,6 @@ int main(void) { // int argc, char **argv
                 switch (ch) {
                     case TRACK: {
                         DEBUG("track");
-                        refresh();
                         if (!search_api("track", painel_w, painel_options)) {
                             DEBUG("Error searching track");
                         }
@@ -203,14 +204,12 @@ int main(void) { // int argc, char **argv
                         break;
                     }
                 }
-                clear_and_write(painel_w, NULL);
-                clear_and_write(playlist_w, NULL);
                 break;
             }
             default:
                 break;
         }
-        refresh();
+        update_panels();
         doupdate();
     }
 
@@ -220,7 +219,7 @@ int main(void) { // int argc, char **argv
 
     free_window(playlist_w);
     free_window(painel_w);
-
+    search_input("KILL");
     endwin();
     exit(0);
     return 0;
@@ -393,7 +392,8 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
             strcat(name_item, " - ");
             strcat(name_item, names[2]);
         }
-     
+
+        DEBUG("%s", name_item);
         w->items[i] = new_item(name_item, id_item);
     }
 
@@ -444,24 +444,44 @@ int clear_and_write(window_t *w, char *str) {
 }
 
 char *search_input(const char * label) {
-    window_t *w = calloc(1, sizeof(window_t));
-    if (!w) {
-        DEBUG("Error allocating memory for search window");
+    static window_t *w;
+    
+    if(strcmp(label, "KILL") == 0){
+        free_window(w);
         return NULL;
     }
+
+    if(strcmp(label, "INIT") == 0){
+        w = calloc(1, sizeof(window_t));
+        if (!w) {
+            DEBUG("Error allocating memory for search window");
+            return NULL;
+        }
+        w->y = 3;
+        w->x = getmaxx(stdscr) * 0.80;
+        w->starty = (getmaxy(stdscr) / 2) - (w->y / 2);
+        w->startx = (getmaxx(stdscr) / 2) - (w->x / 2);
+        
+        if(create_win(w) != OK){
+            DEBUG("Error creating search window");
+            free(w);
+            return NULL;
+        }
+        hide_panel(w->panel);
+        update_panels();
+        doupdate();
+        return NULL;
+    }
+
 
     sprintf(w->label, "Search %s", label);
+    clear_and_write(w, NULL);
 
-    w->y = 3;
-    w->x = getmaxx(stdscr) * 0.80;
-    w->starty = (getmaxy(stdscr) / 2) - (w->y / 2);
-    w->startx = (getmaxx(stdscr) / 2) - (w->x / 2);
+    top_panel(w->panel);
+    show_panel(w->panel);
+    update_panels();
+    doupdate();
 
-    if(create_win(w) != OK){
-        DEBUG("Error creating search window");
-        free(w);
-        return NULL;
-    }
 
     char *track = malloc(1);
     if (!track) {
@@ -483,6 +503,8 @@ char *search_input(const char * label) {
                     track = tmp;
                 }
                 clear_and_write(w, track);
+                update_panels();
+                doupdate();
             }
             continue;
         }
@@ -493,6 +515,8 @@ char *search_input(const char * label) {
                 track[i++] = c;
                 track[i] = '\0';
                 clear_and_write(w, track);
+                update_panels();
+                doupdate();
             } else {
                 DEBUG("Error reallocating memory for track");
                 free(track);
@@ -502,16 +526,11 @@ char *search_input(const char * label) {
         }
     }
 
-    if(wclear(w->window) != OK){
-        DEBUG("Error clearing search window");
-    }
-    if(delwin(w->window) != OK){
-        DEBUG("Error deleting search window");
-    }
-    if(wrefresh(w->window) != OK){
-        DEBUG("Error refreshing screen in search_input");
-    }
-    free(w);
+    clear_and_write(w, NULL);
+    hide_panel(w->panel);
+    update_panels();
+    doupdate();
+    
     return track;
 }
 
@@ -527,6 +546,11 @@ int create_win(window_t *w) {
     }
     if(addLabel(w->window, w->label) != OK){
         DEBUG("Error adding label in create_win");
+        return ERR;
+    }
+    w->panel = new_panel(w->window);
+    if(!w->panel){
+        DEBUG("Error creating panel in create_win");
         return ERR;
     }
     return OK;
@@ -590,7 +614,6 @@ int create_menu(window_t *w, Menu_Options_Seeting options) {
         DEBUG("Invalid parameters in create_menu");
         return ERR;
     }
-    DEBUG("%p", (void *)*((&w->items + 1) - 1));
     w->menu = new_menu((ITEM **)w->items);
     if (w->menu == NULL) {
         DEBUG("Error creating new menu");
@@ -598,8 +621,8 @@ int create_menu(window_t *w, Menu_Options_Seeting options) {
     }
 
     set_menu_win(w->menu, w->window);
-    set_menu_sub(w->menu, derwin(w->window, getmaxy(w->window) - 1, getmaxx(w->window) - 1, 1, 1));
-    set_menu_format(w->menu, getmaxy(w->window) - 3, 0);
+    set_menu_sub(w->menu, derwin(w->window, getmaxy(w->window) - 2, getmaxx(w->window) - 2, 1, 1));
+    set_menu_format(w->menu, getmaxy(w->window) - 3, 1);
     set_menu_mark(w->menu, " * ");
 
     menu_opts_off(w->menu, options.off);
