@@ -43,13 +43,15 @@ char *search_input(const char* label);
 
 char *int_to_string(char* format, int i);
 
+char *filter_chars(char *str);
+
 int search_api(const char *path, window_t *w, Menu_Options_Seeting options);
 
 int create_win(window_t *w);
 int free_window(window_t *w);
 int clear_and_write(window_t *w, char *str);
 
-
+// https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/windows.html
 // https://pubs.opengroup.org/onlinepubs/7908799/xcurses/intovix.html
 // http://graysoftinc.com/terminal-tricks/curses-windows-pads-and-panels
 
@@ -217,9 +219,9 @@ int main(void) { // int argc, char **argv
 
     DEBUG("exiting ...");
 
+    search_input("KILL");
     free_window(playlist_w);
     free_window(painel_w);
-    search_input("KILL");
     endwin();
     exit(0);
     return 0;
@@ -273,7 +275,7 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
     for (int i = 0; i < size; i++) {
 
         char ** names = calloc(3, sizeof(char *));
-        int len = 0;
+        
         if(!names){
             free(input);
             cJSON_Delete(json);
@@ -317,7 +319,6 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                     return ERR;
                 }
                 names[0] = artist_name;
-                len += strlen(artist_name); 
             }
         }
         if (cJSON_HasObjectItem(c_item, "title")) {
@@ -338,7 +339,6 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                 return ERR;
             }
             names[1] = title;
-            len += strlen(title);
         }
         if (cJSON_HasObjectItem(c_item, "nb_tracks")) {
             cJSON *c_nb_tracks = cJSON_GetObjectItem(c_item, "nb_tracks");
@@ -359,7 +359,6 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                 return ERR;
             }
             names[2] = nb_tracks_str;
-            len += strlen(nb_tracks_str);
         }
 
         cJSON *c_id = cJSON_GetObjectItem(c_item, "id");
@@ -380,21 +379,20 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
             return ERR;
         }
 
-        char * name_item = calloc(len + 5, sizeof(char));
+        char * name_item = NULL;
 
         if(names[0] && names[1]){ // Artist - Title
+            name_item = calloc(strlen(names[0]) + strlen(names[1]) + strlen(" - ") + 1, sizeof(char));
             strcat(name_item, names[0]);
             strcat(name_item, " - ");
             strcat(name_item, names[1]);
         }
         if(names[1] && names[2]){ // Title (nb_tracks)
+            name_item = calloc(strlen(names[1]) + strlen(names[2]) + 1, sizeof(char));
             strcat(name_item, names[1]);
-            strcat(name_item, " - ");
             strcat(name_item, names[2]);
         }
-
-        DEBUG("%s", name_item);
-        w->items[i] = new_item(name_item, id_item);
+        w->items[i] = new_item(filter_chars(name_item), id_item);
     }
 
     w->items[size] = NULL;
@@ -441,6 +439,10 @@ int clear_and_write(window_t *w, char *str) {
         }
     }
     return OK;
+}
+
+int is_chars(char c){
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == ' ' || c == '.' || c == ',' || c == '!' || c == '?' || c == '-' || c == '_' || c == ':' || c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}';
 }
 
 char *search_input(const char * label) {
@@ -508,7 +510,7 @@ char *search_input(const char * label) {
             }
             continue;
         }
-        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == ' ' || c == '.' || c == ',' || c == '!' || c == '?') {
+        if (is_chars(c)) {
             char *tmp = realloc(track, i + 2);
             if (tmp) {
                 track = tmp;
@@ -532,6 +534,20 @@ char *search_input(const char * label) {
     doupdate();
     
     return track;
+}
+
+char *filter_chars(char *str) {
+    if (!str) {
+        return NULL;
+    }
+    char *tmp = str;
+    while (*tmp) {
+        if (!is_chars(*tmp)) {
+            *tmp = '_';
+        }
+        tmp++;
+    }
+    return str;
 }
 
 int create_win(window_t *w) {
