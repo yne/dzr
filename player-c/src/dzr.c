@@ -45,7 +45,7 @@ char *int_to_string(char* format, int i);
 
 char *filter_chars(char *str);
 
-int search_api(const char *path, window_t *w);
+int search_api(char *path, window_t *w);
 
 int create_win(window_t *w);
 int free_window(window_t *w);
@@ -217,6 +217,7 @@ int main(void) { // int argc, char **argv
 
     DEBUG("exiting ...");
 
+    search_api("KILL", NULL);
     search_input("KILL");
     free_window(playlist_w);
     free_window(painel_w);
@@ -225,33 +226,70 @@ int main(void) { // int argc, char **argv
     return 0;
 }
 
-int search_api(const char *path, window_t *w) {
+int search_api(char *path, window_t *w) {
+    
     typedef struct  {
+        char * path;
         char * next;
         char * previous;
+        int cur_size;
         int total;
     } response_internals;
-    char *input = search_input(path);
 
-    if (!input || strlen(input) == 0) {
+    static response_internals * response_internal;
+
+    if(!response_internal){
+        response_internal = malloc(sizeof(response_internals));
+        if(!response_internal){
+            DEBUG("Error allocating memory for response_internal");
+            return ERR;
+        }
+        response_internal->path = path;
+        response_internal->next = NULL;
+        response_internal->previous = NULL;
+        response_internal->cur_size = 0;
+        response_internal->total = 0;
+    }
+    if(strcmp(path, "KILL") == 0){
+        free(response_internal);
+        response_internal = NULL;
         return OK;
     }
 
-    if (w->items != NULL || w->menu != NULL) {
-        destroy_menu(w);
+    buffer_t *response_data = NULL;
+
+    if(response_internal->path && strcmp(path, response_internal->path) != 0){
+        response_internal->cur_size = 0;
+        response_internal->path = path;
+        response_internal->next = NULL;
+        response_internal->previous = NULL;
     }
 
-    buffer_t *response_data = api_url_search(path, input);
-    if (!response_data) {
+    if(response_internal && response_internal->next){
+        response_data = http_get(response_internal->next);
+    }else{
+
+        char *input = search_input(path);
+    
+        if (!input || strlen(input) == 0) {
+            return OK;
+        }
+        
+        
+        if (w->items != NULL || w->menu != NULL) {
+            destroy_menu(w);
+        }
+        
+        response_data = api_url_search(path, input);
         free(input);
+    }
+    
+    if (!response_data) {
         return ERR;
     }
 
-    static response_internals response_internal;
-
     cJSON *json = cJSON_ParseWithLength(response_data->data, response_data->size);
     if (!json) {
-        free(input);
         free(response_data->data);
         free(response_data);
         return ERR;
@@ -260,7 +298,8 @@ int search_api(const char *path, window_t *w) {
     if(cJSON_HasObjectItem(json, "total")){
         cJSON *total = cJSON_GetObjectItem(json, "total");
         if(total){
-            response_internal.total = (int)cJSON_GetNumberValue(total);
+            int total_int = cJSON_GetNumberValue(total);
+            response_internal->total = total_int;
         }
     }
 
@@ -269,7 +308,7 @@ int search_api(const char *path, window_t *w) {
         if(next){
             char *next_url = cJSON_GetStringValue(next);
             if(next_url){
-                response_internal.next = next_url;
+                response_internal->next = next_url;
             }
         }
     }
@@ -279,14 +318,13 @@ int search_api(const char *path, window_t *w) {
         if(previous){
             char *previous_url = cJSON_GetStringValue(previous);
             if(previous_url){
-                response_internal.previous = previous_url;
+                response_internal->previous = previous_url;
             }
         }
     }
 
     cJSON *data = cJSON_GetObjectItem(json, "data");
     if (!data) {
-        free(input);
         cJSON_Delete(json);
         free(response_data->data);
         free(response_data);
@@ -294,9 +332,20 @@ int search_api(const char *path, window_t *w) {
     }
 
     int size = cJSON_GetArraySize(data);
-    w->items = malloc(sizeof(ITEM *) * (size + 1));
+    if(!w->items){
+        w->items = malloc(sizeof(ITEM *) * (size + 1));
+    }else{
+        void *tmp = realloc(w->items, sizeof(ITEM *) * ( response_internal->cur_size + size + 1));
+        if(!tmp){
+            cJSON_Delete(json);
+            free(response_data->data);
+            free(response_data);
+            return ERR;
+        }
+        w->items = tmp;
+
+    }
     if (!w->items) {
-        free(input);
         cJSON_Delete(json);
         free(response_data->data);
         free(response_data);
@@ -318,7 +367,6 @@ int search_api(const char *path, window_t *w) {
 
         cJSON *c_item = cJSON_GetArrayItem(data, i);
         if (!c_item) {
-            free(input);
             cJSON_Delete(json);
             free(response_data->data);
             free(response_data);
@@ -327,7 +375,6 @@ int search_api(const char *path, window_t *w) {
         if (cJSON_HasObjectItem(c_item, "artist")) {
             cJSON *c_artist = cJSON_GetObjectItem(c_item, "artist");
             if (!c_artist) {
-                free(input);
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
@@ -336,7 +383,6 @@ int search_api(const char *path, window_t *w) {
             if (cJSON_HasObjectItem(c_artist, "name")) {
                 cJSON *c_name = cJSON_GetObjectItem(c_artist, "name");
                 if (!c_name) {
-                    free(input);
                     cJSON_Delete(json);
                     free(response_data->data);
                     free(response_data);
@@ -344,7 +390,6 @@ int search_api(const char *path, window_t *w) {
                 }
                 char *artist_name = cJSON_GetStringValue(c_name);
                 if (!artist_name) {
-                    free(input);
                     cJSON_Delete(json);
                     free(response_data->data);
                     free(response_data);
@@ -356,7 +401,6 @@ int search_api(const char *path, window_t *w) {
         if (cJSON_HasObjectItem(c_item, "title")) {
             cJSON *c_title = cJSON_GetObjectItem(c_item, "title");
             if (!c_title) {
-                free(input);
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
@@ -364,7 +408,6 @@ int search_api(const char *path, window_t *w) {
             }
             char *title = cJSON_GetStringValue(c_title);
             if (!title) {
-                free(input);
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
@@ -375,7 +418,6 @@ int search_api(const char *path, window_t *w) {
         if (cJSON_HasObjectItem(c_item, "nb_tracks")) {
             cJSON *c_nb_tracks = cJSON_GetObjectItem(c_item, "nb_tracks");
             if (!c_nb_tracks) {
-                free(input);
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
@@ -384,7 +426,6 @@ int search_api(const char *path, window_t *w) {
             int nb_tracks = (int)cJSON_GetNumberValue(c_nb_tracks);
             char *nb_tracks_str = int_to_string(" (%d)", nb_tracks);
             if (!nb_tracks_str) {
-                free(input);
                 cJSON_Delete(json);
                 free(response_data->data);
                 free(response_data);
@@ -395,7 +436,6 @@ int search_api(const char *path, window_t *w) {
 
         cJSON *c_id = cJSON_GetObjectItem(c_item, "id");
         if (!c_id) {
-            free(input);
             cJSON_Delete(json);
             free(response_data->data);
             free(response_data);
@@ -404,7 +444,6 @@ int search_api(const char *path, window_t *w) {
 
         char *id_item = int_to_string(NULL, (int)cJSON_GetNumberValue(c_id));
         if (!id_item) {
-            free(input);
             cJSON_Delete(json);
             free(response_data->data);
             free(response_data);
@@ -424,15 +463,17 @@ int search_api(const char *path, window_t *w) {
             strcat(name_item, names.title);
             strcat(name_item, names.nb_tracks);
         }
-        w->items[i] = new_item(filter_chars(name_item), id_item);
+        w->items[response_internal->cur_size] = new_item(filter_chars(name_item), id_item);
+        
+        response_internal->cur_size++;
+
     }
 
-    w->items[size] = NULL;
+    w->items[response_internal->cur_size + 1] = NULL;
     
     Menu_Options_Seeting options = {.on = O_ONEVALUE, .off = O_SHOWDESC};
     create_menu(w, options);
 
-    free(input);
     cJSON_Delete(json);
     free(response_data->data);
     free(response_data);
@@ -475,57 +516,55 @@ int clear_and_write(window_t *w, char *str) {
     return OK;
 }
 
-int is_chars(char c){
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == ' ' || c == '.' || c == ',' || c == '!' || c == '?' || c == '-' || c == '_' || c == ':' || c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}';
+int is_chars(char c) {
+    static const char valid_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,!?-_[]{}()";
+    return strchr(valid_chars, c) != NULL;
 }
 
-char *search_input(const char * label) {
-    static window_t *w;
-    
-    if(strcmp(label, "KILL") == 0){
-        free_window(w);
+char *search_input(const char *label) {
+    static window_t *search_window;
+
+    if (strcmp(label, "KILL") == 0) {
+        free_window(search_window);
         return NULL;
     }
 
-    if(strcmp(label, "INIT") == 0){
-        w = calloc(1, sizeof(window_t));
-        if (!w) {
-            DEBUG("Error allocating memory for search window");
+    if (strcmp(label, "INIT") == 0) {
+        search_window = calloc(1, sizeof(window_t));
+        if (!search_window) {
             return NULL;
         }
-        w->y = 3;
-        w->x = getmaxx(stdscr) * 0.80;
-        w->starty = (getmaxy(stdscr) / 2) - (w->y / 2);
-        w->startx = (getmaxx(stdscr) / 2) - (w->x / 2);
-        
-        if(create_win(w) != OK){
-            DEBUG("Error creating search window");
-            free(w);
+
+        search_window->y = 3;
+        search_window->x = getmaxx(stdscr) * 0.80;
+        search_window->starty = (getmaxy(stdscr) / 2) - (search_window->y / 2);
+        search_window->startx = (getmaxx(stdscr) / 2) - (search_window->x / 2);
+
+        if (create_win(search_window) != OK) {
+            free(search_window);
             return NULL;
         }
-        hide_panel(w->panel);
+
+        hide_panel(search_window->panel);
         update_panels();
         doupdate();
         return NULL;
     }
 
+    sprintf(search_window->label, "Search %s", label);
+    clear_and_write(search_window, NULL);
 
-    sprintf(w->label, "Search %s", label);
-    clear_and_write(w, NULL);
-
-    top_panel(w->panel);
-    show_panel(w->panel);
+    top_panel(search_window->panel);
+    show_panel(search_window->panel);
     update_panels();
     doupdate();
 
-
-    char *track = malloc(1);
-    if (!track) {
-        DEBUG("Error allocating memory for track");
-        free_window(w);
+    char *input = malloc(1);
+    if (!input) {
+        free_window(search_window);
         return NULL;
     }
-    track[0] = '\0';
+    input[0] = '\0';
 
     int i = 0;
     int c;
@@ -533,55 +572,56 @@ char *search_input(const char * label) {
         if (c == KEY_BACKSPACE) {
             if (i > 0) {
                 i--;
-                track[i] = '\0';
-                char *tmp = realloc(track, i + 1);
+                input[i] = '\0';
+                char *tmp = realloc(input, i + 1);
                 if (tmp) {
-                    track = tmp;
+                    input = tmp;
                 }
-                clear_and_write(w, track);
+                clear_and_write(search_window, input);
                 update_panels();
                 doupdate();
             }
             continue;
         }
         if (is_chars(c)) {
-            char *tmp = realloc(track, i + 2);
+            char *tmp = realloc(input, i + 2);
             if (tmp) {
-                track = tmp;
-                track[i++] = c;
-                track[i] = '\0';
-                clear_and_write(w, track);
+                input = tmp;
+                input[i++] = c;
+                input[i] = '\0';
+                clear_and_write(search_window, input);
                 update_panels();
                 doupdate();
             } else {
-                DEBUG("Error reallocating memory for track");
-                free(track);
-                free_window(w);
+                free(input);
+                free_window(search_window);
                 return NULL;
             }
         }
     }
 
-    clear_and_write(w, NULL);
-    hide_panel(w->panel);
+    clear_and_write(search_window, NULL);
+    hide_panel(search_window->panel);
     update_panels();
     doupdate();
-    
-    return track;
+
+    return input;
 }
 
-char *filter_chars(char *str) {
-    if (!str) {
+char *filter_chars(char *input_string) {
+    if (!input_string) {
         return NULL;
     }
-    char *tmp = str;
-    while (*tmp) {
-        if (!is_chars(*tmp)) {
-            *tmp = '_';
+
+    char *output_string = input_string;
+    while (*output_string) {
+        if (!is_chars(*output_string)) {
+            *output_string = '_';
         }
-        tmp++;
+        output_string++;
     }
-    return str;
+
+    return input_string;
 }
 
 int create_win(window_t *w) {

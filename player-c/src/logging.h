@@ -2,6 +2,7 @@
 #define LOGGING_H
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdarg.h>
 
 #ifdef __linux__
@@ -20,8 +21,7 @@ static inline void LOG(const char *fmt, ...) {
     return;
   }
   vsnprintf(buf, needed, fmt, args);
-  
-  mvaddstr(getmaxy(stdscr), 2, buf);
+  mvaddstr(getmaxy(stdscr) - 2, 2, buf);
   va_end(args);
   wrefresh(stdscr);
 }
