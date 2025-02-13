@@ -205,11 +205,11 @@ buffer_t *http_post(char *url, struct curl_slist *headers, cJSON *json) {
 
 buffer_t *api_url_search(const char *path, const char *query) {
     char *encoded_query = curl_easy_escape(NULL, query, strlen(query));
-    int needed = snprintf(NULL, 0, "%s/search/%s?q=%s&limit=100000", API_URL, path, encoded_query);
+    int needed = snprintf(NULL, 0, "%s/search/%s?q=%s&limit=500", API_URL, path, encoded_query);
     char *url = malloc(needed + 1);
     buffer_t *result = NULL;
     if (url) {
-        snprintf(url, needed + 1, "%s/search/%s?q=%s&limit=100000", API_URL, path, encoded_query);
+        snprintf(url, needed + 1, "%s/search/%s?q=%s&limit=500", API_URL, path, encoded_query);
         result = http_get(url);
         free(url);
     } else {

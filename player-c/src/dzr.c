@@ -45,7 +45,7 @@ char *int_to_string(char* format, int i);
 
 char *filter_chars(char *str);
 
-int search_api(const char *path, window_t *w, Menu_Options_Seeting options);
+int search_api(const char *path, window_t *w);
 
 int create_win(window_t *w);
 int free_window(window_t *w);
@@ -66,8 +66,6 @@ int main(void) { // int argc, char **argv
     //     .on = O_ONEVALUE,
     //     .off = O_SHOWDESC
     // };
-
-    Menu_Options_Seeting painel_options = {.on = O_ONEVALUE, .off = O_SHOWDESC};
 
     window_t *playlist_w = calloc(1, sizeof(window_t));
     if(!playlist_w){
@@ -165,28 +163,28 @@ int main(void) { // int argc, char **argv
                 switch (ch) {
                     case TRACK: {
                         DEBUG("track");
-                        if (!search_api("track", painel_w, painel_options)) {
+                        if (!search_api("track", painel_w)) {
                             DEBUG("Error searching track");
                         }
                         break;
                     }
                     case ARTIST: {
                         DEBUG("artist");
-                        if (!search_api("artist", painel_w, painel_options)) {
+                        if (!search_api("artist", painel_w)) {
                             DEBUG("Error searching track");
                         }
                         break;
                     }
                     case ALBUM: {
                         DEBUG("album");
-                        if (!search_api("album", painel_w, painel_options)) {
+                        if (!search_api("album", painel_w)) {
                             DEBUG("Error searching track");
                         }
                         break;
                     }
                     case PLAYLIST: {
                         DEBUG("playlist");
-                        if (!search_api("playlist", painel_w, painel_options)) {
+                        if (!search_api("playlist", painel_w)) {
                             DEBUG("Error searching track");
                         }
                         break;
@@ -227,8 +225,12 @@ int main(void) { // int argc, char **argv
     return 0;
 }
 
-int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
-
+int search_api(const char *path, window_t *w) {
+    typedef struct  {
+        char * next;
+        char * previous;
+        int total;
+    } response_internals;
     char *input = search_input(path);
 
     if (!input || strlen(input) == 0) {
@@ -245,12 +247,41 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
         return ERR;
     }
 
+    static response_internals response_internal;
+
     cJSON *json = cJSON_ParseWithLength(response_data->data, response_data->size);
     if (!json) {
         free(input);
         free(response_data->data);
         free(response_data);
         return ERR;
+    }
+
+    if(cJSON_HasObjectItem(json, "total")){
+        cJSON *total = cJSON_GetObjectItem(json, "total");
+        if(total){
+            response_internal.total = (int)cJSON_GetNumberValue(total);
+        }
+    }
+
+    if(cJSON_HasObjectItem(json, "next")){
+        cJSON *next = cJSON_GetObjectItem(json, "next");
+        if(next){
+            char *next_url = cJSON_GetStringValue(next);
+            if(next_url){
+                response_internal.next = next_url;
+            }
+        }
+    }
+
+    if(cJSON_HasObjectItem(json, "prev")){
+        cJSON *previous = cJSON_GetObjectItem(json, "prev");
+        if(previous){
+            char *previous_url = cJSON_GetStringValue(previous);
+            if(previous_url){
+                response_internal.previous = previous_url;
+            }
+        }
     }
 
     cJSON *data = cJSON_GetObjectItem(json, "data");
@@ -272,17 +303,18 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
         return ERR;
     }
     
+    typedef struct {
+        char *artist;
+        char *title;
+        char *nb_tracks;
+    } names_t;
+
     for (int i = 0; i < size; i++) {
 
-        char ** names = calloc(3, sizeof(char *));
-        
-        if(!names){
-            free(input);
-            cJSON_Delete(json);
-            free(response_data->data);
-            free(response_data);
-            return ERR;
-        }
+        names_t names;
+        names.artist = NULL;
+        names.title = NULL;
+        names.nb_tracks = NULL;
 
         cJSON *c_item = cJSON_GetArrayItem(data, i);
         if (!c_item) {
@@ -318,7 +350,7 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                     free(response_data);
                     return ERR;
                 }
-                names[0] = artist_name;
+                names.artist = artist_name;
             }
         }
         if (cJSON_HasObjectItem(c_item, "title")) {
@@ -338,7 +370,7 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                 free(response_data);
                 return ERR;
             }
-            names[1] = title;
+            names.title = title;
         }
         if (cJSON_HasObjectItem(c_item, "nb_tracks")) {
             cJSON *c_nb_tracks = cJSON_GetObjectItem(c_item, "nb_tracks");
@@ -358,7 +390,7 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
                 free(response_data);
                 return ERR;
             }
-            names[2] = nb_tracks_str;
+            names.nb_tracks = nb_tracks_str;
         }
 
         cJSON *c_id = cJSON_GetObjectItem(c_item, "id");
@@ -381,22 +413,23 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
 
         char * name_item = NULL;
 
-        if(names[0] && names[1]){ // Artist - Title
-            name_item = calloc(strlen(names[0]) + strlen(names[1]) + strlen(" - ") + 1, sizeof(char));
-            strcat(name_item, names[0]);
+        if(names.artist && names.title){ // Artist - Title
+            name_item = calloc(strlen(names.artist) + strlen(names.title) + strlen(" - ") + 1, sizeof(char));
+            strcat(name_item, names.artist);
             strcat(name_item, " - ");
-            strcat(name_item, names[1]);
+            strcat(name_item, names.title);
         }
-        if(names[1] && names[2]){ // Title (nb_tracks)
-            name_item = calloc(strlen(names[1]) + strlen(names[2]) + 1, sizeof(char));
-            strcat(name_item, names[1]);
-            strcat(name_item, names[2]);
+        if(names.title && names.nb_tracks){ // Title (nb_tracks)
+            name_item = calloc(strlen(names.title) + strlen(names.nb_tracks) + 1, sizeof(char));
+            strcat(name_item, names.title);
+            strcat(name_item, names.nb_tracks);
         }
         w->items[i] = new_item(filter_chars(name_item), id_item);
     }
 
     w->items[size] = NULL;
     
+    Menu_Options_Seeting options = {.on = O_ONEVALUE, .off = O_SHOWDESC};
     create_menu(w, options);
 
     free(input);
@@ -405,6 +438,7 @@ int search_api(const char *path, window_t *w, Menu_Options_Seeting options) {
     free(response_data);
     return 1;
 }
+
 
 char *int_to_string(char *format, int i) {
     char *str = calloc(10, sizeof(char));
@@ -655,11 +689,15 @@ int create_menu(window_t *w, Menu_Options_Seeting options) {
 
 int drive_menu(window_t *w, int key) {
     if (w == NULL || w->menu == NULL) {
-        DEBUG("Invalid parameters in drive_menu");
+        DEBUG("Menu does not exist on window %s", (w ? w->label : ""));
         return ERR;
     }
-    if (menu_driver(w->menu, key) != E_OK) {
-        DEBUG("Error driving menu");
+    int i = 0;
+    if ((i = menu_driver(w->menu, key)) != E_OK) {
+        if(i == E_REQUEST_DENIED){
+            return E_REQUEST_DENIED;
+        }
+        DEBUG("Error driving menu %d", i);
         return ERR;
     }
     return OK;
