@@ -154,7 +154,7 @@ int main(void) { // int argc, char **argv
             }
             case KEY_F(1): {
                 DEBUG("f1");
-
+                search_api("track", painel_w);
                 break;
             }
             case COMMAND: {
@@ -323,33 +323,21 @@ int search_api(char *path, window_t *w) {
         }
     }
 
-    cJSON *data = cJSON_GetObjectItem(json, "data");
-    if (!data) {
-        cJSON_Delete(json);
-        free(response_data->data);
-        free(response_data);
-        return ERR;
-    }
+    #define CHECK(json_field) if(!json_field){ cJSON_Delete(json); free(response_data->data); free(response_data); return ERR; }
 
+    cJSON *data = cJSON_GetObjectItem(json, "data");
+    CHECK(data);
+
+   
     int size = cJSON_GetArraySize(data);
     if(!w->items){
         w->items = malloc(sizeof(ITEM *) * (size + 1));
+        CHECK(w->items);   
     }else{
         void *tmp = realloc(w->items, sizeof(ITEM *) * ( response_internal->cur_size + size + 1));
-        if(!tmp){
-            cJSON_Delete(json);
-            free(response_data->data);
-            free(response_data);
-            return ERR;
-        }
+        CHECK(tmp);
         w->items = tmp;
 
-    }
-    if (!w->items) {
-        cJSON_Delete(json);
-        free(response_data->data);
-        free(response_data);
-        return ERR;
     }
     
     typedef struct {
@@ -357,6 +345,7 @@ int search_api(char *path, window_t *w) {
         char *title;
         char *nb_tracks;
     } names_t;
+    
 
     for (int i = 0; i < size; i++) {
 
@@ -366,89 +355,40 @@ int search_api(char *path, window_t *w) {
         names.nb_tracks = NULL;
 
         cJSON *c_item = cJSON_GetArrayItem(data, i);
-        if (!c_item) {
-            cJSON_Delete(json);
-            free(response_data->data);
-            free(response_data);
-            return ERR;
-        }
+        CHECK(c_item);
+        
         if (cJSON_HasObjectItem(c_item, "artist")) {
             cJSON *c_artist = cJSON_GetObjectItem(c_item, "artist");
-            if (!c_artist) {
-                cJSON_Delete(json);
-                free(response_data->data);
-                free(response_data);
-                return ERR;
-            }
+            CHECK(c_artist);
             if (cJSON_HasObjectItem(c_artist, "name")) {
                 cJSON *c_name = cJSON_GetObjectItem(c_artist, "name");
-                if (!c_name) {
-                    cJSON_Delete(json);
-                    free(response_data->data);
-                    free(response_data);
-                    return ERR;
-                }
+                CHECK(c_name);
                 char *artist_name = cJSON_GetStringValue(c_name);
-                if (!artist_name) {
-                    cJSON_Delete(json);
-                    free(response_data->data);
-                    free(response_data);
-                    return ERR;
-                }
+                CHECK(artist_name);
                 names.artist = artist_name;
             }
         }
         if (cJSON_HasObjectItem(c_item, "title")) {
             cJSON *c_title = cJSON_GetObjectItem(c_item, "title");
-            if (!c_title) {
-                cJSON_Delete(json);
-                free(response_data->data);
-                free(response_data);
-                return ERR;
-            }
+            CHECK(c_title);
             char *title = cJSON_GetStringValue(c_title);
-            if (!title) {
-                cJSON_Delete(json);
-                free(response_data->data);
-                free(response_data);
-                return ERR;
-            }
+            CHECK(title);
             names.title = title;
         }
         if (cJSON_HasObjectItem(c_item, "nb_tracks")) {
             cJSON *c_nb_tracks = cJSON_GetObjectItem(c_item, "nb_tracks");
-            if (!c_nb_tracks) {
-                cJSON_Delete(json);
-                free(response_data->data);
-                free(response_data);
-                return ERR;
-            }
+            CHECK(c_nb_tracks);
             int nb_tracks = (int)cJSON_GetNumberValue(c_nb_tracks);
             char *nb_tracks_str = int_to_string(" (%d)", nb_tracks);
-            if (!nb_tracks_str) {
-                cJSON_Delete(json);
-                free(response_data->data);
-                free(response_data);
-                return ERR;
-            }
+            CHECK(nb_tracks_str);
             names.nb_tracks = nb_tracks_str;
         }
 
         cJSON *c_id = cJSON_GetObjectItem(c_item, "id");
-        if (!c_id) {
-            cJSON_Delete(json);
-            free(response_data->data);
-            free(response_data);
-            return ERR;
-        }
+        CHECK(c_id);
 
         char *id_item = int_to_string(NULL, (int)cJSON_GetNumberValue(c_id));
-        if (!id_item) {
-            cJSON_Delete(json);
-            free(response_data->data);
-            free(response_data);
-            return ERR;
-        }
+        CHECK(id_item);
 
         char * name_item = NULL;
 
@@ -472,7 +412,12 @@ int search_api(char *path, window_t *w) {
     w->items[response_internal->cur_size + 1] = NULL;
     
     Menu_Options_Seeting options = {.on = O_ONEVALUE, .off = O_SHOWDESC};
-    create_menu(w, options);
+    if(create_menu(w, options) != OK){
+        cJSON_Delete(json);
+        free(response_data->data);
+        free(response_data);
+        return ERR;
+    }
 
     cJSON_Delete(json);
     free(response_data->data);
