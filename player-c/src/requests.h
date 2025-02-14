@@ -20,8 +20,8 @@ buffer_t *api_url_search(const char *path, const char *query);
 
 buffer_t *api_url_id(const char *path, const char *id);
 
-buffer_t *http_get(char *url);
+buffer_t *http_get(const char *url);
 
-buffer_t *http_post(char *url, struct curl_slist *headers, cJSON *json);
+buffer_t *http_post(const char *url, struct curl_slist *headers, cJSON *json);
 
 #endif /* REQUESTS_H */

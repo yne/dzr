@@ -236,10 +236,10 @@ int search_api(char *path, window_t *w) {
         int total;
     } response_internals;
 
-    static response_internals * response_internal;
+    static response_internals* response_internal;
 
     if(!response_internal){
-        response_internal = malloc(sizeof(response_internals));
+        response_internal = calloc(1, sizeof(response_internals));
         if(!response_internal){
             DEBUG("Error allocating memory for response_internal");
             return ERR;
@@ -251,6 +251,9 @@ int search_api(char *path, window_t *w) {
         response_internal->total = 0;
     }
     if(strcmp(path, "KILL") == 0){
+        free(response_internal->path);
+        free(response_internal->next);
+        free(response_internal->previous);
         free(response_internal);
         response_internal = NULL;
         return OK;
@@ -263,6 +266,9 @@ int search_api(char *path, window_t *w) {
         response_internal->path = path;
         response_internal->next = NULL;
         response_internal->previous = NULL;
+        if (w->items != NULL || w->menu != NULL) {
+            destroy_menu(w);
+        }
     }
 
     if(response_internal && response_internal->next){
@@ -274,12 +280,6 @@ int search_api(char *path, window_t *w) {
         if (!input || strlen(input) == 0) {
             return OK;
         }
-        
-        
-        if (w->items != NULL || w->menu != NULL) {
-            destroy_menu(w);
-        }
-        
         response_data = api_url_search(path, input);
         free(input);
     }
@@ -308,7 +308,8 @@ int search_api(char *path, window_t *w) {
         if(next){
             char *next_url = cJSON_GetStringValue(next);
             if(next_url){
-                response_internal->next = next_url;
+                response_internal->next = calloc(strlen(next_url) + 1, sizeof(char));
+                strcpy(response_internal->next, next_url);
             }
         }
     }
@@ -318,7 +319,9 @@ int search_api(char *path, window_t *w) {
         if(previous){
             char *previous_url = cJSON_GetStringValue(previous);
             if(previous_url){
-                response_internal->previous = previous_url;
+                response_internal->previous = calloc(strlen(previous_url) + 1, sizeof(char));
+                strcpy(response_internal->previous, previous_url);
+
             }
         }
     }
@@ -409,9 +412,22 @@ int search_api(char *path, window_t *w) {
 
     }
 
-    w->items[response_internal->cur_size + 1] = NULL;
+    w->items[response_internal->cur_size] = NULL;
     
     Menu_Options_Seeting options = {.on = O_ONEVALUE, .off = O_SHOWDESC};
+    
+    if(w->menu){
+        int i = 0;
+        if((i = unpost_menu(w->menu)) != E_OK){
+            DEBUG("Error unposting menu %d", i);
+            return ERR;
+        }
+        if((i = free_menu(w->menu)) != E_OK){
+            DEBUG("Error freeing menu %d", i);
+            return ERR;
+        };
+    }
+
     if(create_menu(w, options) != OK){
         cJSON_Delete(json);
         free(response_data->data);

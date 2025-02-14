@@ -86,7 +86,13 @@ void curl_set_proxy(CURL *curl, char *proxy) {
     free(host);
 }
 
-buffer_t *http_get(char *url) {
+/**
+ * @brief Envia uma solicita o HTTP GET para um url.
+ *
+ * @param url URL a ser enviada a solicita o.
+ * @return buffer_t* com a resposta da solicita o.
+ */
+buffer_t *http_get(const char *url) {
 
     buffer_t *response_data = malloc(sizeof(buffer_t));
     if (!response_data) {
@@ -138,7 +144,15 @@ buffer_t *http_get(char *url) {
     return response_data;
 }
 
-buffer_t *http_post(char *url, struct curl_slist *headers, cJSON *json) {
+/**
+ * @brief Envia uma solicita o HTTP POST para um url, com um JSON e headers.
+ *
+ * @param url URL a ser enviada a solicita o.
+ * @param headers Headers a serem incluidos na solicita o.
+ * @param json JSON a ser enviado na solicita o.
+ * @return buffer_t* com a resposta da solicita o.
+ */
+buffer_t *http_post(const char *url, struct curl_slist *headers, cJSON *json) {
 
     buffer_t *response_data = malloc(sizeof(buffer_t));
     if (!response_data) {
@@ -203,6 +217,14 @@ buffer_t *http_post(char *url, struct curl_slist *headers, cJSON *json) {
     return response_data;
 }
 
+/**
+ * @brief Retorna um buffer com a resposta a uma solicita o HTTP GET para
+ *        a URL <code>API_URL/search/<i>path</i>?q=<i>query</i>&limit=500</code>.
+ *
+ * @param path Parte da URL entre "search/" e o '?' da query.
+ * @param query Query a ser enviada na solicita o.
+ * @return buffer_t* com a resposta da solicita o.
+ */
 buffer_t *api_url_search(const char *path, const char *query) {
     char *encoded_query = curl_easy_escape(NULL, query, strlen(query));
     int needed = snprintf(NULL, 0, "%s/search/%s?q=%s&limit=500", API_URL, path, encoded_query);
@@ -218,6 +240,14 @@ buffer_t *api_url_search(const char *path, const char *query) {
     return result;
 }
 
+/**
+ * @brief Retorna um buffer com a resposta a uma solicita o HTTP GET para
+ *        a URL <code>API_URL/<i>path</i>/<i>id</i></code>.
+ *
+ * @param path Parte da URL entre "https://api.deezer.com" e o <i>id</i>.
+ * @param id   ID da entidade a ser retornada.
+ * @return buffer_t* com a resposta da solicita o.
+ */
 buffer_t *api_url_id(const char *path, const char *id) {
     int needed = snprintf(NULL, 0, "%s/%s/%s", API_URL, path, id);
     char *url = malloc(needed + 1);
