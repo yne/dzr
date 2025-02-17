@@ -33,7 +33,7 @@ static inline void LOG(const char *fmt, ...) {
   do {                                                                         \
     fprintf(stderr, "DEBUG: " fmt "\n", ##__VA_ARGS__);                        \
     fflush(stderr);                                                            \
-    LOG("DEBUG: " fmt , ##__VA_ARGS__);                                        \
+    /*LOG("DEBUG: " fmt , ##__VA_ARGS__);*/                                    \
   } while (0)
 #else
 #define DEBUG(fmt, ...)

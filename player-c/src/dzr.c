@@ -54,6 +54,7 @@ int clear_and_write(window_t *w, char *str);
 // https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/windows.html
 // https://pubs.opengroup.org/onlinepubs/7908799/xcurses/intovix.html
 // http://graysoftinc.com/terminal-tricks/curses-windows-pads-and-panels
+// https://sploitfun.wordpress.com/2015/02/10/understanding-glibc-malloc
 
 int main(void) { // int argc, char **argv
 
@@ -368,7 +369,8 @@ int search_api(char *path, window_t *w) {
                 CHECK(c_name);
                 char *artist_name = cJSON_GetStringValue(c_name);
                 CHECK(artist_name);
-                names.artist = artist_name;
+                names.artist = malloc(strlen(artist_name) + 1);
+                strcpy(names.artist, artist_name);
             }
         }
         if (cJSON_HasObjectItem(c_item, "title")) {
@@ -376,7 +378,8 @@ int search_api(char *path, window_t *w) {
             CHECK(c_title);
             char *title = cJSON_GetStringValue(c_title);
             CHECK(title);
-            names.title = title;
+            names.title = malloc(strlen(title) + 1);
+            strcpy(names.title, title);
         }
         if (cJSON_HasObjectItem(c_item, "nb_tracks")) {
             cJSON *c_nb_tracks = cJSON_GetObjectItem(c_item, "nb_tracks");
@@ -384,7 +387,8 @@ int search_api(char *path, window_t *w) {
             int nb_tracks = (int)cJSON_GetNumberValue(c_nb_tracks);
             char *nb_tracks_str = int_to_string(" (%d)", nb_tracks);
             CHECK(nb_tracks_str);
-            names.nb_tracks = nb_tracks_str;
+            names.nb_tracks = malloc(strlen(nb_tracks_str) + 1);
+            strcpy(names.nb_tracks, nb_tracks_str);
         }
 
         cJSON *c_id = cJSON_GetObjectItem(c_item, "id");
@@ -400,11 +404,17 @@ int search_api(char *path, window_t *w) {
             strcat(name_item, names.artist);
             strcat(name_item, " - ");
             strcat(name_item, names.title);
+
+            free(names.artist);
+            free(names.title);
         }
         if(names.title && names.nb_tracks){ // Title (nb_tracks)
             name_item = calloc(strlen(names.title) + strlen(names.nb_tracks) + 1, sizeof(char));
             strcat(name_item, names.title);
             strcat(name_item, names.nb_tracks);
+
+            free(names.title);
+            free(names.nb_tracks);
         }
         w->items[response_internal->cur_size] = new_item(filter_chars(name_item), id_item);
         
@@ -417,23 +427,29 @@ int search_api(char *path, window_t *w) {
     Menu_Options_Seeting options = {.on = O_ONEVALUE, .off = O_SHOWDESC};
     
     if(w->menu){
-        int i = 0;
-        if((i = unpost_menu(w->menu)) != E_OK){
-            DEBUG("Error unposting menu %d", i);
-            return ERR;
+        for(int i = 0; w->items[i] != NULL; i++){
+            DEBUG("%s",item_name(w->items[i]) );
         }
-        if((i = free_menu(w->menu)) != E_OK){
-            DEBUG("Error freeing menu %d", i);
-            return ERR;
-        };
-    }
+        int i = 0;
+        if((i = unpost_menu(w->menu)) != E_OK){ // Unpost menu
+            DEBUG("Error unposting menu %i", i);
+        }
+        if((i = set_menu_items(w->menu, w->items)) != E_OK){ 
+            DEBUG("Error setting menu items %i", i);
+        }
 
+        if((i = post_menu(w->menu)) != E_OK){ // Post menu
+            DEBUG("Error posting menu %i", i);
+        }
+
+    }
     if(create_menu(w, options) != OK){
         cJSON_Delete(json);
         free(response_data->data);
         free(response_data);
         return ERR;
     }
+
 
     cJSON_Delete(json);
     free(response_data->data);
@@ -443,8 +459,9 @@ int search_api(char *path, window_t *w) {
 
 
 char *int_to_string(char *format, int i) {
-    char *str = calloc(10, sizeof(char));
-    sprintf(str, format ? format : "%d", i);
+    int len = snprintf(NULL, 0, format ? format : "%d", i);
+    char *str = calloc(len + 1, sizeof(char));
+    snprintf(str, len + 1, format ? format : "%d", i);
     return (char *)str;
 }
 
