@@ -37,6 +37,7 @@ static inline void init_curses() {
   raw();
   keypad(stdscr, TRUE);
   setlocale(LC_ALL, "");
+  TRACE("Curses initialized ...");
 }
 
 #endif // DZR_H

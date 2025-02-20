@@ -11,7 +11,7 @@
   #include <ncursesw/curses.h>
 #endif
 
-static inline void LOG(const char *fmt, ...) {
+static inline void DEBUG_CURSES(const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
   int needed = vsnprintf(NULL, 0, fmt, args) + 1;
@@ -26,17 +26,17 @@ static inline void LOG(const char *fmt, ...) {
   wrefresh(stdscr);
 }
 
-#define DEBUG_MODE 1
+#define TRACE_MODE 1
 
-#if DEBUG_MODE
-#define DEBUG(fmt, ...)                                                        \
-  do {                                                                         \
-    fprintf(stderr, "DEBUG: " fmt "\n", ##__VA_ARGS__);                        \
-    fflush(stderr);                                                            \
-    /*LOG("DEBUG: " fmt , ##__VA_ARGS__);*/                                    \
-  } while (0)
+#if TRACE_MODE
+  #define TRACE(fmt, ...)                                                        \
+    do {                                                                         \
+      fprintf(stderr, "TRACE: " fmt "\n", ##__VA_ARGS__);                        \
+      fflush(stderr);                                                            \
+      /*LOG("DEBUG: " fmt , ##__VA_ARGS__);*/                                    \
+    } while (0)
 #else
-#define DEBUG(fmt, ...)
+  #define TRACE(fmt, ...)
 #endif
 
 
