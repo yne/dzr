@@ -56,4 +56,6 @@ target_compile_options(dzr PUBLIC -g3)
 set(LIBRARIES ${NCURSES_LIBRARY} ${CURL_LIBRARIES} ${CJSON_LIBRARY} ${MENU_LIBRARY} ${PANEL_LIBRARY})
 MESSAGE(STATUS "Bibliotecas encontradas: ${LIBRARIES}")
 target_link_libraries(dzr ${LIBRARIES})
-add_custom_target(run ALL ./build/dzr 2>"./out.log" )
+
+add_custom_target(debug ./build/dzr 2>"./out.log" )
+add_custom_target(valgrind valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --verbose --log-file=valgrind-out.log ./build/dzr 2>"./out.log" )

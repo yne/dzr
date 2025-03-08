@@ -4,7 +4,7 @@
 #include <string.h>
 #include <wchar.h>
 
-enum Commands {
+typedef enum {
     CTRL_D = 4,
     COMMAND = ':',
     UP = KEY_UP,
@@ -25,7 +25,7 @@ enum Commands {
     USER = 'u',
     GENRE = 'g',
     RADIO = 'r'
-};
+} Commands;
 
 typedef struct {
     Menu_Options on;
@@ -268,12 +268,18 @@ int search_api(char *path, window_t *w) {
         response_internal->cur_size = 0;
         response_internal->total = 0;
     }
+    
     if(strcmp(path, "KILL") == 0){
-        free(response_internal->path);
-        free(response_internal->next);
-        free(response_internal->previous);
-        free(response_internal);
-        response_internal = NULL;
+        if(response_internal){
+            if(response_internal->path)
+                free(response_internal->path);
+            if(response_internal->next)
+                free(response_internal->next);
+            if(response_internal->previous)
+                free(response_internal->previous);
+            free(response_internal);
+            response_internal = NULL;
+        }
         return OK;
     }
 
@@ -288,6 +294,11 @@ int search_api(char *path, window_t *w) {
             TRACE("search_api: Resetting menu");
             destroy_menu(w);
         }
+    }
+    
+    if (response_internal->cur_size > 0 && response_internal->total > 0 && response_internal->cur_size > response_internal->total - 1) {
+        TRACE("search_api: Search reach to total");
+        return 1;    
     }
 
     if(response_internal && response_internal->next){
@@ -307,6 +318,7 @@ int search_api(char *path, window_t *w) {
         TRACE("search_api: Error getting response data");
         return ERR;
     }
+    
 
     cJSON *json = cJSON_ParseWithLength(response_data->data, response_data->size);
     if (!json) {
@@ -456,11 +468,6 @@ int search_api(char *path, window_t *w) {
         if((i = post_menu(w->menu)) != E_OK){
             TRACE("search_api: Error posting menu %i", i);
         }
-    }
-
-    if (response_internal->cur_size > response_internal->total - 1) {
-        TRACE("search_api: Search reach to total");
-        return 1;    
     }
 
     if(w->menu == NULL){ 
