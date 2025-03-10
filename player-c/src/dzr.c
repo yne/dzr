@@ -359,7 +359,14 @@ int search_api(char *path, window_t *w) {
         }
     }
 
-    #define CHECK(json_field) if(!json_field){ cJSON_Delete(json); free(response_data->data); free(response_data); TRACE("search_api: Error in %s", #json_field); return ERR; }
+#define CHECK(json_field)                                                                                                                            \
+    if (!json_field) {                                                                                                                               \
+        cJSON_Delete(json);                                                                                                                          \
+        free(response_data->data);                                                                                                                   \
+        free(response_data);                                                                                                                         \
+        TRACE("search_api: Error in %s", #json_field);                                                                                               \
+        return ERR;                                                                                                                                  \
+    }
 
     cJSON *data = cJSON_GetObjectItem(json, "data");
     CHECK(data);
@@ -530,8 +537,14 @@ int clear_and_write(window_t *w, char *str) {
 }
 
 int is_chars(char c) {
-    static const char valid_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,!?-_[]{}()";
-    return strchr(valid_chars, c) != NULL;
+    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || 
+        (c >= '0' && c <= '9') || c == ' ' || c == '.' || 
+        c == ',' || c == '!' || c == '?' || c == '-' || 
+        c == '_' || c == '[' || c == ']' || c == '{' || 
+        c == '}' || c == '(' || c == ')') {
+        return 1;
+    }
+    return 0;
 }
 
 char *search_input(const char *label) {
