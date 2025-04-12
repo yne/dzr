@@ -247,11 +247,17 @@ int search_api(char *path, window_t *w) {
     TRACE("search_api: Entered");
     
     typedef struct {
+        char * name;
+        int id;
+    } response_items;
+
+    typedef struct {
         char * path;
         char * next;
         char * previous;
         int cur_size;
         int total;
+        response_items ** items;
     } response_internals;
 
     static response_internals* response_internal;
@@ -267,6 +273,7 @@ int search_api(char *path, window_t *w) {
         response_internal->previous = NULL;
         response_internal->cur_size = 0;
         response_internal->total = 0;
+        response_internal->items = NULL;
     }
     
     if(strcmp(path, "KILL") == 0){
@@ -277,6 +284,18 @@ int search_api(char *path, window_t *w) {
                 free(response_internal->next);
             if(response_internal->previous)
                 free(response_internal->previous);
+            if(response_internal->items){
+                for(int i = 0;response_internal->items[i] != NULL; i++){
+                    if(response_internal->items[i]->name){
+                        free(response_internal->items[i]->name);
+                        response_internal->items[i]->name = NULL;
+                    }
+                    free(response_internal->items[i]);
+                    response_internal->items[i] = NULL;
+                }
+                free(response_internal->items);
+                response_internal->items = NULL;
+            }
             free(response_internal);
             response_internal = NULL;
         }
@@ -366,13 +385,14 @@ int search_api(char *path, window_t *w) {
 
    
     int size = cJSON_GetArraySize(data);
-    if(!w->items){
-        w->items = malloc(sizeof(ITEM *) * (size + 1));
-        CHECK(w->items);   
+
+    if(!response_internal->items){
+        response_internal->items = malloc(sizeof(response_items *) * (size + 1));
+        CHECK(response_internal->items);
     }else{
-        void *tmp = realloc(w->items, sizeof(ITEM *) * ( response_internal->cur_size + size + 1));
+        void *tmp = realloc(response_internal->items, sizeof(response_items *) * (response_internal->cur_size + size + 1));
         CHECK(tmp);
-        w->items = tmp;
+        response_internal->items = tmp;
 
     }
     
@@ -423,12 +443,6 @@ int search_api(char *path, window_t *w) {
             strcpy(names.nb_tracks, nb_tracks_str);
         }
 
-        cJSON *c_id = cJSON_GetObjectItem(c_item, "id");
-        CHECK(c_id);
-
-        char *id_item = int_to_string(NULL, (int)cJSON_GetNumberValue(c_id));
-        CHECK(id_item);
-
         char * name_item = NULL;
 
         if(names.artist && names.title){ // Artist - Title
@@ -449,37 +463,39 @@ int search_api(char *path, window_t *w) {
             free(names.nb_tracks);
         }
         
-        w->items[response_internal->cur_size] = new_item(filter_chars(name_item), id_item);
+        
+        cJSON *c_id = cJSON_GetObjectItem(c_item, "id");
+        CHECK(c_id);
+
+        int id_item = (int) cJSON_GetNumberValue(c_id);
+
+        response_internal->items[response_internal->cur_size] = malloc(sizeof(response_items));
+        response_internal->items[response_internal->cur_size]->name = filter_chars(name_item);
+        response_internal->items[response_internal->cur_size]->id = id_item;
+    
         response_internal->cur_size++;
     }
-
-    w->items[response_internal->cur_size] = NULL;
     
-
-    if(w->menu){
-        
-        int i = 0;
-        if((i = unpost_menu(w->menu)) != E_OK){ 
-            TRACE("search_api: Error unposting menu %i", i);
-        }
-        if((i = set_menu_items(w->menu, w->items)) != E_OK){ 
-            TRACE("search_api: Error setting menu items %i", i);
-        }
-        if((i = post_menu(w->menu)) != E_OK){
-            TRACE("search_api: Error posting menu %i", i);
-        }
+    response_internal->items[response_internal->cur_size] = NULL;
+    
+    ITEM **items = malloc(sizeof(ITEM *) * (response_internal->cur_size + 1));
+    for(int i = 0; i < response_internal->cur_size; i++){
+        char * id_str = int_to_string(NULL, response_internal->items[i]->id);
+        items[i] = new_item(response_internal->items[i]->name, id_str);
     }
 
-    if(w->menu == NULL){ 
-        TRACE("search_api: Creating menu");
-        Menu_Options_Seeting options = {.on = O_ONEVALUE, .off = O_SHOWDESC};
-        if(create_menu(w, options) != OK){
-            cJSON_Delete(json);
-            free(response_data->data);
-            free(response_data);
-            return ERR;
-        }
+    if(w->menu && w->items){
+        destroy_menu(w);
     }
+    w->items = items;
+    
+    Menu_Options_Seeting setting = {
+        .on = O_ONEVALUE,
+        .off = O_SHOWDESC
+    };
+    create_menu(w, setting);
+
+    
 
     cJSON_Delete(json);
     free(response_data->data);
@@ -757,7 +773,7 @@ int create_menu(window_t *w, Menu_Options_Seeting options) {
     }
 
     TRACE("create_menu: Creating new menu");
-    w->menu = new_menu((ITEM **)w->items);
+    w->menu = new_menu(w->items);
     if (w->menu == NULL) {
         TRACE("create_menu: Error creating new menu");
         return ERR;

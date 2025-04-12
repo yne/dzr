@@ -6,7 +6,7 @@ set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Define as flags de compilação para mostrar avisos e gerar símbolos de depuração
-add_compile_options(-Wall -Wextra -Wno-unused-parameter -Wno-unused-function)
+add_compile_options(-Wall -Wextra -Wno-unused-parameter -Wno-unused-function) 
 
 # Define o diretório de saída para os binários
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
