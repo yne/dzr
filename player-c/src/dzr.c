@@ -426,19 +426,13 @@ int search_api(char *path, window_t *w) {
             if (cJSON_HasObjectItem(c_artist, "name")) {
                 cJSON *c_name = cJSON_GetObjectItem(c_artist, "name");
                 CHECK(c_name);
-                char *artist_name = cJSON_GetStringValue(c_name);
-                CHECK(artist_name);
-                names.artist = malloc(strlen(artist_name) + 1);
-                strcpy(names.artist, artist_name);
+                names.artist = filter_chars(cJSON_GetStringValue(c_name));
             }
         }
         if (cJSON_HasObjectItem(c_item, "title")) {
             cJSON *c_title = cJSON_GetObjectItem(c_item, "title");
             CHECK(c_title);
-            char *title = cJSON_GetStringValue(c_title);
-            CHECK(title);
-            names.title = malloc(strlen(title) + 1);
-            strcpy(names.title, title);
+            names.title = filter_chars(cJSON_GetStringValue(c_title));
         }
         if (cJSON_HasObjectItem(c_item, "nb_tracks")) {
             cJSON *c_nb_tracks = cJSON_GetObjectItem(c_item, "nb_tracks");
@@ -457,17 +451,11 @@ int search_api(char *path, window_t *w) {
             strcat(name_item, names.artist);
             strcat(name_item, " - ");
             strcat(name_item, names.title);
-
-            free(names.artist);
-            free(names.title);
         }
         if(names.title && names.nb_tracks){ // Title (nb_tracks)
             name_item = calloc(strlen(names.title) + strlen(names.nb_tracks) + 1, sizeof(char));
             strcat(name_item, names.title);
             strcat(name_item, names.nb_tracks);
-
-            free(names.title);
-            free(names.nb_tracks);
         }
         
         
@@ -774,6 +762,8 @@ int destroy_menu(window_t *w) {
         }
         w->items[i] = NULL;
     }
+    free(w->items);
+    w->items = NULL;
     TRACE("destroy_menu: Ended");
     return OK;
 }
