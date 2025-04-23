@@ -36,6 +36,8 @@ int create_menu(window_t *w, Menu_Options_Seeting options);
 
 int destroy_menu(window_t *w);
 
+int destroy_itens(window_t *w);
+
 int drive_menu(window_t *w, int key);
 
 int addLabel(WINDOW *win, char *str);
@@ -480,15 +482,23 @@ int search_api(char *path, window_t *w) {
     }
 
     if(w->menu && w->items){
-        destroy_menu(w);
+        destroy_itens(w);
     }
     w->items = items;
     
-    Menu_Options_Seeting setting = {
-        .on = O_ONEVALUE,
-        .off = O_SHOWDESC
-    };
-    create_menu(w, setting);
+    if(!w->menu){
+        Menu_Options_Seeting setting = {
+            .on = O_ONEVALUE,
+            .off = O_SHOWDESC
+        };
+        create_menu(w, setting);
+    }else{
+        int i = 0;
+        i = unpost_menu(w->menu);
+        i = set_menu_items(w->menu, w->items);
+        i = post_menu(w->menu);
+        i++;
+    }
 
     
 
@@ -753,18 +763,29 @@ int destroy_menu(window_t *w) {
         return OK;
     }
 
-    TRACE("destroy_menu: Freeing menu items");
+    destroy_itens(w);
+
+    return OK;
+}
+
+int destroy_itens(window_t *w) {
+    if (w == NULL || w->items == NULL) {
+        TRACE("destroy_itens: Invalid parameters");
+        return ERR;
+    }
+
+    TRACE("destroy_itens: Freeing menu items");
     for (int i = 0; w->items[i] != NULL; i++) {
-        TRACE("destroy_menu: Freeing item %d", i);
+        TRACE("destroy_itens: Freeing item %d", i);
         if (free_item(w->items[i]) != E_OK) {
-            TRACE("destroy_menu: Error freeing item %d", i);
+            TRACE("destroy_itens: Error freeing item %d", i);
             return ERR;
         }
         w->items[i] = NULL;
     }
     free(w->items);
     w->items = NULL;
-    TRACE("destroy_menu: Ended");
+    TRACE("destroy_itens: Ended");
     return OK;
 }
 
