@@ -73,34 +73,26 @@ int main(void) { // int argc, char **argv
     //     .off = O_SHOWDESC
     // };
 
-    window_t *playlist_w = calloc(1, sizeof(window_t));
-    if(!playlist_w){
-        TRACE("Error allocating memory for playlist window");
-        goto exit;
-    }
-    if(!strcpy(playlist_w->label, "Playlist")){
-        TRACE("Error copying label to playlist window");
-        goto exit;
-    }
+    window_t *playlist_w = malloc(sizeof(window_t));
+    strcpy(playlist_w->label, "Playlist");
 
     playlist_w->y = yMax;
     playlist_w->x = xMax * 0.20;
     playlist_w->starty = 0;
     playlist_w->startx = 0;
+    playlist_w->menu = NULL;
+    playlist_w->items = NULL;
     
-    window_t *painel_w = calloc(1, sizeof(window_t));
-    if(!painel_w){
-        TRACE("Error allocating memory for painel window");
-        goto exit;
-    }
-    if(!strcpy(painel_w->label, "Painel")){
-        TRACE("Error copying label to painel window");
-        goto exit;
-    }
+    window_t *painel_w = malloc(sizeof(window_t));
+
+    strcpy(painel_w->label, "Painel");
+    
     painel_w->y = yMax;
     painel_w->x = xMax * 0.80;
     painel_w->starty = 0;
     painel_w->startx = playlist_w->x;
+    painel_w->menu = NULL;
+    painel_w->items = NULL;
 
     TRACE("main: creating playlist window");
     if(create_win(playlist_w) != OK){
@@ -238,8 +230,12 @@ int main(void) { // int argc, char **argv
 
     search_api("KILL", NULL);
     search_input("KILL");
-    free_window(playlist_w);
-    free_window(painel_w);
+    if(playlist_w != NULL){
+        free_window(playlist_w);
+    }
+    if(painel_w != NULL){
+        free_window(painel_w);
+    }
     endwin();
     exit(0);
     return 0;
@@ -256,7 +252,6 @@ int search_api(char *path, window_t *w) {
     typedef struct {
         char * path;
         char * next;
-        char * previous;
         int cur_size;
         int total;
         response_items ** items;
@@ -265,14 +260,13 @@ int search_api(char *path, window_t *w) {
     static response_internals* response_internal;
 
     if(!response_internal){
-        response_internal = calloc(1, sizeof(response_internals));
+        response_internal = malloc(sizeof(response_internals));
         if(!response_internal){
             TRACE("search_api: Error allocating memory for response_internal");
             return ERR;
         }
         response_internal->path = path;
         response_internal->next = NULL;
-        response_internal->previous = NULL;
         response_internal->cur_size = 0;
         response_internal->total = 0;
         response_internal->items = NULL;
@@ -284,8 +278,6 @@ int search_api(char *path, window_t *w) {
                 free(response_internal->path);
             if(response_internal->next)
                 free(response_internal->next);
-            if(response_internal->previous)
-                free(response_internal->previous);
             if(response_internal->items){
                 for(int i = 0;response_internal->items[i] != NULL; i++){
                     if(response_internal->items[i]->name){
@@ -310,7 +302,6 @@ int search_api(char *path, window_t *w) {
         response_internal->cur_size = 0;
         response_internal->path = path;
         response_internal->next = NULL;
-        response_internal->previous = NULL;
         if (w->items != NULL || w->menu != NULL) {
             TRACE("search_api: Resetting menu");
             destroy_menu(w);
@@ -362,20 +353,11 @@ int search_api(char *path, window_t *w) {
         if(next){
             char *next_url = cJSON_GetStringValue(next);
             if(next_url){
-                response_internal->next = calloc(strlen(next_url) + 1, sizeof(char));
+                if(response_internal->next){
+                    free(response_internal->next);
+                }
+                response_internal->next = malloc(strlen(next_url) + 1);
                 strcpy(response_internal->next, next_url);
-            }
-        }
-    }
-
-    if(cJSON_HasObjectItem(json, "prev")){
-        cJSON *previous = cJSON_GetObjectItem(json, "prev");
-        if(previous){
-            char *previous_url = cJSON_GetStringValue(previous);
-            if(previous_url){
-                response_internal->previous = calloc(strlen(previous_url) + 1, sizeof(char));
-                strcpy(response_internal->previous, previous_url);
-
             }
         }
     }
@@ -475,11 +457,18 @@ int search_api(char *path, window_t *w) {
     
     response_internal->items[response_internal->cur_size] = NULL;
     
-    ITEM **items = malloc(sizeof(ITEM *) * (response_internal->cur_size + 1));
-    for(int i = 0; i < response_internal->cur_size; i++){
+    ITEM **items = malloc(sizeof(ITEM *) * (response_internal->cur_size + 2));
+    
+    int i = 0;
+    for(; response_internal->items[i] != NULL; i++){
         char * id_str = int_to_string(NULL, response_internal->items[i]->id);
         items[i] = new_item(response_internal->items[i]->name, id_str);
     }
+    if(response_internal->next){
+        items[i] = new_item("-- Next Page --", "NEXT_PAGE");
+        i++;
+    }
+    items[i] = NULL;
 
     if(w->menu && w->items){
         destroy_itens(w);
@@ -497,7 +486,7 @@ int search_api(char *path, window_t *w) {
         i = unpost_menu(w->menu);
         i = set_menu_items(w->menu, w->items);
         i = post_menu(w->menu);
-        i++;
+        TRACE("search_api: Menu updated %d", i);
     }
 
     

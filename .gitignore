@@ -33,3 +33,7 @@ vgcore.*
 # Arquivos específicos do sistema operacional
 .DS_Store
 Thumbs.db
+
+.nx/installation
+.nx/cache
+.nx/workspace-data

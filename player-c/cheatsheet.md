@@ -1,106 +1,407 @@
-## Funções de Inicialização:
+# NCurses Cheatsheet
+
+## Índice
+
+- [Inicialização e Finalização](#inicialização-e-finalização)
+- [Gerenciamento de Janelas](#gerenciamento-de-janelas)
+- [Entrada e Saída](#entrada-e-saída)
+- [Atributos e Cores](#atributos-e-cores)
+- [Exemplos Práticos](#exemplos-práticos)
+
+## Inicialização e Finalização
+
+### Funções Básicas
 
 - `initscr()`:
-  - Descrição: Inicializa a biblioteca ncurses e cria uma janela de tela cheia.
-  - Parâmetros: Nenhum.
-  - Retorna: Um ponteiro para a janela de tela cheia.
+  - **Descrição**: Inicializa a biblioteca ncurses e cria uma janela de tela cheia (stdscr).
+  - **Parâmetros**: Nenhum.
+  - **Retorno**: Um ponteiro para a janela de tela cheia.
+  - **Exemplo**:
+
+    
+```c
+WINDOW *stdscr = initscr();
+if (stdscr == NULL) {
+    fprintf(stderr, "Erro ao inicializar ncurses\n");
+    return 1;
+}
+```
+
 
 - `endwin()`:
-  - Descrição: Restaura o terminal para seu estado original e encerra o uso da biblioteca ncurses.
-  - Parâmetros: Nenhum.
-  - Retorna: Nenhum.
+  - **Descrição**: Restaura o terminal para seu estado original e encerra o uso da biblioteca ncurses.
+  - **Parâmetros**: Nenhum.
+  - **Retorno**: `OK` em caso de sucesso, `ERR` em caso de erro.
+  - **Exemplo**:
 
-- `refresh()`:
-  - Descrição: Atualiza a tela, refletindo as alterações feitas nas janelas e painéis.
-  - Parâmetros: Nenhum.
-  - Retorna: Nenhum.
+    
+```c
+int result = endwin();
+if (result == ERR) {
+    fprintf(stderr, "Erro ao finalizar ncurses\n");
+}
+```
 
-- `wrefresh(window)`:
-  - Descrição: Atualiza a janela especificada, refletindo as alterações feitas.
-  - Parâmetros:
-    - `window`: Um ponteiro para a janela a ser atualizada.
-  - Retorna: Nenhum.
 
-- `raw()`:
-  - Descrição: Define o modo bruto, desabilitando o processamento de caracteres de controle.
-  - Parâmetros: Nenhum.
-  - Retorna: Nenhum.
+### Modos de Entrada/Saída
 
-- `cbreak()`:
-  - Descrição: Define o modo de quebra de linha, permitindo que os caracteres de controle sejam interpretados como qualquer outro caractere.
-  - Parâmetros: Nenhum.
-  - Retorna: Nenhum.
+- `raw()` e `cbreak()`:
+  - **Descrição**:
+    - `raw()`: Desabilita o processamento de caracteres de controle (Ctrl+C, Ctrl+Z, etc.).
+    - `cbreak()`: Habilita o modo de quebra de linha, mas ainda processa caracteres de controle.
+  - **Uso típico**:
 
-- `echo()`:
-  - Descrição: Habilita o eco de caracteres digitados pelo usuário.
-  - Parâmetros: Nenhum.
-  - Retorna: Nenhum.
+    
+```c
+raw();  // Para jogos que precisam de controle total sobre a entrada
+// ou
+cbreak();  // Para aplicações que precisam de processamento de caracteres de controle
+```
 
-- `noecho()`:
-  - Descrição: Desabilita o eco de caracteres digitados pelo usuário.
-  - Parâmetros: Nenhum.
-  - Retorna: Nenhum.
+
+- `echo()` e `noecho()`:
+  - **Descrição**: Controla se os caracteres digitados são ecoados para a tela.
+  - **Uso típico**:
+
+    
+```c
+noecho();  // Normalmente usado em jogos e interfaces personalizadas
+// ou
+echo();    // Útil para entrada de texto em formulários
+```
+
 
 - `keypad(window, TRUE)`:
-  - Descrição: Habilita o modo de teclado, permitindo a leitura de teclas de função na janela especificada.
-  - Parâmetros:
-    - `window`: Um ponteiro para a janela.
-    - `TRUE`: Habilita o modo de teclado.
-  - Retorna: Nenhum.
+  - **Descrição**: Habilita o processamento de teclas de função e teclas especiais (setas, F1-F12, etc.).
+  - **Exemplo**:
 
-- `halfdelay(tenths)`:
-  - Descrição: Define o modo de atraso parcial, aguardando a entrada do usuário por uma fração de segundo especificada.
-  - Parâmetros:
-    - `tenths`: O número de décimos de segundo para aguardar a entrada.
-  - Retorna: Nenhum.
+    
+```c
+keypad(stdscr, TRUE);  // Habilita teclas de função na janela padrão
+int ch = getch();
+if (ch == KEY_UP) { /* tratar seta para cima */ }
+```
 
-## Funções Diversas:
 
-- `clear()`:
-  - Descrição: Limpa a janela de tela cheia.
-  - Parâmetros: Nenhum.
-  - Retorna: Nenhum.
+## Gerenciamento de Janelas
 
-- `wclear(window)`:
-  - Descrição: Limpa a janela especificada.
-  - Parâmetros:
-    - `window`: Um ponteiro para a janela a ser limpa.
-  - Retorna: Nenhum.
+### Criação e Destruição
 
-- `move(y, x)`:
-  - Descrição: Move o cursor para a posição especificada na janela de tela cheia.
-  - Parâmetros:
-    - `y`: A coordenada y (linha) para mover o cursor.
-    - `x`: A coordenada x (coluna) para mover o cursor.
-  - Retorna: Nenhum.
+- `newwin(nlines, ncols, begin_y, begin_x)`:
+  - **Descrição**: Cria uma nova janela.
+  - **Parâmetros**:
+    - `nlines`: Número de linhas da janela.
+    - `ncols`: Número de colunas da janela.
+    - `begin_y`: Linha inicial.
+    - `begin_x`: Coluna inicial.
+  - **Exemplo**:
 
-- `wmove(window, y, x)`:
-  - Descrição: Move o cursor para a posição especificada na janela especificada.
-  - Parâmetros:
-    - `window`: Um ponteiro para a janela.
-    - `y`: A coordenada y (linha) para mover o cursor.
-    - `x`: A coordenada x (coluna) para mover o cursor.
-  - Retorna: Nenhum.
+    
+```c
+WINDOW *win = newwin(10, 30, 5, 10);  // Janela 10x30 começando em (5,10)
+if (win == NULL) {
+    // Tratar erro
+}
+```
 
-- `getmaxyx(window, y, x)`:
-  - Descrição: Obtém as dimensões da janela especificada.
-  - Parâmetros:
-    - `window`: Um ponteiro para a janela.
-    - `y`: Um ponteiro para armazenar a altura da janela (número de linhas).
-    - `x`: Um ponteiro para armazenar a largura da janela (número de colunas).
-  - Retorna: Nenhum.
 
-- `getyx(window, y, x)`:
-  - Descrição: Obtém a posição atual do cursor na janela especificada.
-  - Parâmetros:
-    - `window`: Um ponteiro para a janela.
-    - `y`: Um ponteiro para armazenar a coordenada y (linha) do cursor.
-    - `x`: Um ponteiro para armazenar a coordenada x (coluna) do cursor.
-  - Retorna: Nenhum.
+- `delwin(window)`:
+  - **Descrição**: Libera a memória alocada para uma janela.
+  - **Importante**: Nunca delete stdscr com esta função.
 
-## Funções de Saída:
+### Atualização de Tela
 
-- `addch(ch)`:
+- `refresh()` e `wrefresh(win)`:
+  - **Dica de desempenho**: Minimize chamadas a essas funções, pois são custosas.
+  - **Padrão comum**:
+
+    ```c
+    // Atualizar múltiplas janelas
+    wrefresh(win1);
+    wrefresh(win2);
+    // Ou para a janela padrão
+    refresh();
+    ```
+
+## Entrada e Saída
+
+### Funções de Saída
+
+- `printw` e variantes:
+  - **Equivalência**: Funcionam como `printf`, mas para janelas ncurses.
+  - **Exemplo**:
+
+    ```c
+    int x = 10, y = 5;
+    mvwprintw(win, y, x, "Pontuação: %d", score);
+    ```
+
+- `box(win, ver, hor)`:
+  - **Descrição**: Desenha uma borda ao redor da janela.
+  - **Exemplo**:
+
+    ```c
+    box(win, 0, 0);  // Usa caracteres padrão
+    // Ou com caracteres personalizados
+    box(win, '|', '-');
+    ```
+
+## Atributos e Cores
+
+### Inicialização
+
+- `start_color()`:
+  - **Obrigatório**: Deve ser chamado antes de usar cores.
+  - **Exemplo**:
+
+    ```c
+    if (has_colors()) {
+        start_color();
+        // Inicializar pares de cores
+    }
+    ```
+
+### Pares de Cores
+
+- `init_pair(pair, fg, bg)`:
+  - **Limites**: Números de pares vão de 1 a COLOR_PAIRS-1.
+  - **Exemplo**:
+
+    ```c
+    init_pair(1, COLOR_WHITE, COLOR_BLUE);
+    wattron(win, COLOR_PAIR(1));
+    wprintw(win, "Texto em branco sobre azul");
+    wattroff(win, COLOR_PAIR(1));
+    ```
+
+## Exemplos Práticos
+
+### Estrutura Básica de um Programa
+
+```c
+#include <ncurses.h>
+
+int main() {
+    // Inicialização
+    initscr();
+    cbreak();
+    noecho();
+    keypad(stdscr, TRUE);
+    
+    // Verificar suporte a cores
+    if (has_colors()) {
+        start_color();
+        init_pair(1, COLOR_WHITE, COLOR_BLUE);
+    }
+    
+    // Lógica principal
+    printw("Pressione qualquer tecla para continuar...");
+    refresh();
+    getch();
+    
+    // Finalização
+    endwin();
+    return 0;
+}
+```
+
+### Criando um Menu Simples
+
+```c
+void show_menu(WINDOW *win) {
+    char *options[] = {"Opção 1", "Opção 2", "Sair"};
+    int n_options = 3;
+    int highlight = 0;
+    int ch;
+    
+    while (1) {
+        for (int i = 0; i < n_options; i++) {
+            if (i == highlight)
+                wattron(win, A_REVERSE);
+            mvwprintw(win, i + 1, 1, "%s", options[i]);
+            wattroff(win, A_REVERSE);
+        }
+        
+        ch = wgetch(win);
+        switch (ch) {
+            case KEY_UP:
+                highlight = (highlight - 1 + n_options) % n_options;
+                break;
+            case KEY_DOWN:
+                highlight = (highlight + 1) % n_options;
+                break;
+            case 10:  // Enter
+                if (highlight == n_options - 1) return;
+                // Processar seleção
+                break;
+        }
+    }
+}
+```
+
+## Dicas de Desempenho
+
+### Atualizações de Tela
+
+- Use `wnoutrefresh()` seguido de `doupdate()` para atualizações em lote
+- Atualize apenas as partes da tela que mudaram
+
+### Gerenciamento de Memória
+
+- Sempre libere janelas com `delwin()`
+- Use `clearok(stdscr, TRUE)` para forçar uma limpeza completa quando necessário
+
+### Portabilidade
+
+- Teste em diferentes terminais
+- Use constantes como `COLS` e `LINES` para dimensões da tela
+
+## Funções de Entrada Avançadas
+
+### Leitura de Teclado
+
+- `getch()` e `wgetch(win)`:
+  - **Descrição**: Lê um único caractere do teclado.
+  - **Retorno**: O caractere lido ou `ERR` em caso de erro.
+  - **Exemplo**:
+    ```c
+    int ch;
+    nodelay(stdscr, TRUE);  // Modo não-bloqueante
+    while ((ch = getch()) == ERR) {
+        // Espera por entrada
+    }
+    ```
+
+- `getnstr(str, n)` e `wgetnstr(win, str, n)`:
+  - **Descrição**: Lê uma string com limite de tamanho.
+  - **Parâmetros**:
+    - `str`: Buffer para armazenar a string.
+    - `n`: Número máximo de caracteres a serem lidos.
+  - **Exemplo**:
+    ```c
+    char nome[50];
+    echo();  // Habilita eco
+    getnstr(nome, 49);
+    ```
+
+### Manipulação de Janelas
+
+- `subwin(orig, nlines, ncols, begin_y, begin_x)`:
+  - **Descrição**: Cria uma subjanela dentro de outra janela.
+  - **Exemplo**:
+    ```c
+    WINDOW *sub = subwin(stdscr, 5, 20, 10, 10);
+    box(sub, 0, 0);
+    wrefresh(sub);
+    ```
+
+- `mvwin(win, y, x)`:
+  - **Descrição**: Move uma janela para uma nova posição na tela.
+  - **Atenção**: Não pode mover janelas que se estendam além dos limites da tela.
+
+## Gerenciamento de Cores
+
+### Inicialização de Cores
+
+- `start_color()`:
+  - **Deve ser chamado** antes de qualquer outra função de cor.
+  - **Verificação**:
+    ```c
+    if (has_colors() == FALSE) {
+        endwin();
+        printf("Seu terminal não suporta cores!\n");
+        return 1;
+    }
+    start_color();
+    ```
+
+### Pares de Cores Personalizados
+
+- `init_color(color, r, g, b)`:
+  - **Descrição**: Define uma cor personalizada no terminal.
+  - **Valores**: r, g, b variam de 0 a 1000.
+  - **Exemplo**:
+    ```c
+    init_color(COLOR_MAGENTA, 300, 0, 300);
+    init_pair(1, COLOR_WHITE, COLOR_MAGENTA);
+    ```
+
+## Funções de Atributos
+
+- `attron(attrs)` e `wattron(win, attrs)`:
+  - **Atributos comuns**:
+    - `A_NORMAL`: Atributo normal (desativa todos os outros)
+    - `A_STANDOUT`: Máxima visibilidade
+    - `A_UNDERLINE`: Sublinhado
+    - `A_REVERSE`: Cores de primeiro e segundo plano trocadas
+    - `A_BLINK`: Texto piscante
+    - `A_DIM`: Texto com metade do brilho
+    - `A_BOLD`: Texto em negrito
+
+## Exemplo de Painel (Panel)
+
+```c
+#include <panel.h>
+
+int main() {
+    initscr();
+    cbreak();
+    noecho();
+    
+    // Criar janelas
+    WINDOW *win1 = newwin(10, 30, 5, 10);
+    WINDOW *win2 = newwin(10, 30, 8, 15);
+    
+    // Criar painéis
+    PANEL *panel1 = new_panel(win1);
+    PANEL *panel2 = new_panel(win2);
+    
+    // Desenhar conteúdo
+    box(win1, 0, 0);
+    box(win2, 0, 0);
+    mvwprintw(win1, 1, 1, "Painel 1");
+    mvwprintw(win2, 1, 1, "Painel 2");
+    
+    // Atualizar a pilha de exibição
+    update_panels();
+    doupdate();
+    
+    getch();
+    endwin();
+    return 0;
+}
+```
+
+## Dicas de Desempenho
+
+1. **Atualizações de Tela**
+   - Use `wnoutrefresh()` seguido de `doupdate()` para atualizações em lote
+   - Atualize apenas as partes da tela que mudaram
+
+2. **Gerenciamento de Memória**
+   - Sempre libere janelas com `delwin()`
+   - Use `clearok(stdscr, TRUE)` para forçar uma limpeza completa quando necessário
+
+3. **Portabilidade**
+   - Teste em diferentes terminais
+   - Use constantes como `COLS` e `LINES` para dimensões da tela
+
+## Referências
+
+- [NCurses Programming HOWTO](https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/)
+- `man ncurses` para documentação detalhada
+- `curses.h` - Arquivo de cabeçalho completo com todas as definições
+
+---
+*Documentação atualizada em 26/05/2024*
+
+  - `top`: Caractere para a borda superior.
+  - `bottom`: Caractere para a borda inferior.
+  - `tl_corner`: Caractere para o canto superior esquerdo.
+  - `tr_corner`: Caractere para o canto superior direito.
+  - `bl_corner`: Caractere para o canto inferior esquerdo.
+  - `br_corner`: Caractere para o canto inferior direito.
+- **Retorno**: Nenhum.
   - Descrição: Adiciona um caractere na posição atual do cursor na janela de tela cheia.
   - Parâmetros:
     - `ch`: O caractere a ser adicionado.
@@ -137,11 +438,6 @@
     - `...`: Argumentos opcionais para substituir os espaços reservados na string de formato.
   - Retorna: Nenhum.
 
-- `mvprintw(y, x, format, ...)`:
-  - Descrição: Move o cursor para a posição especificada e imprime uma string formatada.
-  - Parâmetros:
-    - `y`: A coordenada y (linha) para mover o cursor.
-    - `x`: A coordenada x (coluna) para mover o cursor.
     - `format`: Uma string de formato.
     - `...`: Argumentos opcionais para substituir os espaços reservados.
   - Retorna: Nenhum.
@@ -194,12 +490,225 @@
     - `str`: A string a ser adicionada.
   - Retorna: Nenhum.
 
-## Funções de Entrada:
+## Funções de Entrada
 
-- `getch()`:
-  - Descrição: Lê um caractere do teclado, aguardando a entrada do usuário.
-  - Parâmetros: Nenhum.
-  - Retorna: O caractere lido como um inteiro.
+### `getch()` e `wgetch(win)`
+
+- **Descrição**: Lê um único caractere do teclado.
+- **Parâmetros**:
+  - `win`: Janela para ler (apenas para `wgetch`).
+- **Retorno**: O caractere lido ou `ERR` se nenhuma entrada estiver disponível.
+
+**Exemplo**:
+
+```c
+int ch = getch();
+if (ch == 'q') {
+    // Sair do programa
+} else if (ch == KEY_UP) {
+    // Tecla de seta para cima pressionada
+}
+```
+
+### `getstr(str)` e `wgetstr(win, str)`
+
+- **Descrição**: Lê uma string do teclado até encontrar uma nova linha ou EOF.
+- **Atenção**: Não verifica estouro de buffer. Use `getnstr` para segurança.
+
+**Exemplo**:
+
+```c
+char nome[50];
+echo();  // Habilita eco
+getstr(nome);
+```
+
+### `getnstr(str, n)` e `wgetnstr(win, str, n)`
+
+- **Descrição**: Versão segura de `getstr` com limite de caracteres.
+
+**Exemplo**:
+
+```c
+char senha[20];
+noecho();  // Desabilita eco para senhas
+getnstr(senha, 19);
+```
+
+### `scanw(format, ...)` e `wscanw(win, format, ...)`
+
+- **Descrição**: Lê dados formatados do teclado, similar a `scanf`.
+
+**Exemplo**:
+
+```c
+int idade;
+scanw("Digite sua idade: %d", &idade);
+```
+
+## Gerenciamento de Janelas Avançado
+
+### Criação e Destruição
+
+#### `newwin(nlines, ncols, begin_y, begin_x)`
+
+- **Descrição**: Cria uma nova janela.
+- **Parâmetros**:
+  - `nlines`, `ncols`: Dimensões da janela.
+  - `begin_y`, `begin_x`: Posição do canto superior esquerdo.
+- **Retorno**: Ponteiro para a nova janela ou `NULL` em caso de erro.
+
+#### `delwin(win)`
+
+- **Descrição**: Libera a memória de uma janela.
+- **Atenção**: Não use em `stdscr` ou janelas já deletadas.
+
+### `subwin(orig, nlines, ncols, begin_y, begin_x)`
+
+- **Descrição**: Cria uma subjanela que compartilha memória com a janela original.
+- **Dica**: Útil para criar painéis dentro de janelas.
+
+## Manipulação de Janelas
+
+### `mvwin(win, y, x)`
+
+- **Descrição**: Move uma janela para novas coordenadas.
+- **Limitação**: Não pode mover além dos limites da tela.
+
+### `wresize(win, lines, cols)`
+
+- **Descrição**: Redimensiona uma janela.
+- **Compatibilidade**: Disponível apenas em algumas implementações do NCurses.
+
+### `overlay(src, dest)` e `overwrite(src, dest)`
+
+- **Descrição**: Copia o conteúdo de uma janela para outra.
+- **Diferença**: `overlay` preserva espaços em branco, `overwrite` não.
+
+## Atributos e Cores
+
+### Gerenciamento de Atributos
+
+### `attron(attrs)` e `wattron(win, attrs)`
+
+- **Atributos comuns**:
+  - `A_NORMAL`: Atributo normal
+  - `A_STANDOUT`: Máxima visibilidade
+  - `A_UNDERLINE`: Texto sublinhado
+  - `A_REVERSE`: Cores invertidas
+  - `A_BLINK`: Texto piscante
+  - `A_DIM`: Texto com brilho reduzido
+  - `A_BOLD`: Texto em negrito
+
+### `init_pair(pair, fg, bg)`
+
+- **Descrição**: Define uma combinação de cores.
+
+**Exemplo**:
+
+```c
+start_color();
+init_pair(1, COLOR_RED, COLOR_BLACK);
+attron(COLOR_PAIR(1));
+printw("Texto em vermelho");
+attroff(COLOR_PAIR(1));
+```
+
+## Funções de Tempo
+
+### `napms(ms)`
+
+- **Descrição**: Pausa a execução por milissegundos.
+
+**Exemplo**:
+
+```c
+napms(500);  // Pausa por 500ms
+```
+
+### `timeout(delay)` e `wtimeout(win, delay)`
+
+- **Descrição**: Define um tempo limite para entrada.
+- **Valores especiais**:
+  - `-1`: Bloqueia até a entrada estar disponível
+  - `0`: Não bloqueia
+  - `> 0`: Espera por no máximo `delay` milissegundos
+
+## Exemplos Práticos
+
+### Menu Interativo
+
+```c
+int show_menu(WINDOW *win, char *items[], int n_items) {
+    int highlight = 0;
+    int ch;
+    
+    keypad(win, TRUE);
+    noecho();
+    
+    while (1) {
+        for (int i = 0; i < n_items; i++) {
+            if (i == highlight)
+                wattron(win, A_REVERSE);
+            mvwprintw(win, i + 1, 1, "%s", items[i]);
+            wattroff(win, A_REVERSE);
+        }
+        
+        ch = wgetch(win);
+        switch (ch) {
+            case KEY_UP:    highlight = (highlight - 1 + n_items) % n_items; break;
+            case KEY_DOWN:  highlight = (highlight + 1) % n_items; break;
+            case '\n':     return highlight;
+            case 'q':      return -1;  // Sair
+        }
+    }
+}
+```
+
+### Barra de Progresso
+
+```c
+void draw_progress_bar(WINDOW *win, int y, int x, int width, float progress) {
+    int filled = (int)(progress * width);
+    mvwaddch(win, y, x, '[');
+    for (int i = 0; i < width - 2; i++) {
+        mvwaddch(win, y, x + 1 + i, i < filled ? '=' : ' ');
+    }
+    mvwaddch(win, y, x + width - 1, ']');
+    wrefresh(win);
+}
+```
+
+## Referências Adicionais
+
+### Constantes Úteis
+
+- **Cores**: `COLOR_BLACK`, `COLOR_RED`, `COLOR_GREEN`, `COLOR_YELLOW`, `COLOR_BLUE`, `COLOR_MAGENTA`, `COLOR_CYAN`, `COLOR_WHITE`
+- **Teclas Especiais**: `KEY_UP`, `KEY_DOWN`, `KEY_LEFT`, `KEY_RIGHT`, `KEY_HOME`, `KEY_END`, `KEY_NPAGE`, `KEY_PPAGE`
+- **Atributos**: `A_NORMAL`, `A_STANDOUT`, `A_UNDERLINE`, `A_REVERSE`, `A_BLINK`, `A_DIM`, `A_BOLD`
+
+### Macros Úteis
+
+- `getmaxyx(win, y, x)`: Obtém as dimensões da janela
+- `getbegyx(win, y, x)`: Obtém a posição da janela
+- `getyx(win, y, x)`: Obtém a posição do cursor
+
+---
+*Documentação atualizada em 26/05/2024*
+
+  - **Descrição**: Lê um único caractere do teclado.
+  - **Parâmetros**:
+    - `win`: Janela para ler (apenas para `wgetch`).
+  - **Retorno**: O caractere lido ou `ERR` se nenhuma entrada estiver disponível.
+  - **Exemplo**:
+    ```c
+    int ch = getch();
+    if (ch == 'q') {
+        // Sair do programa
+    } else if (ch == KEY_UP) {
+        // Tecla de seta para cima pressionada
+    }
+    ```
 
 - `mvgetch(y, x)`:
   - Descrição: Move o cursor para a posição especificada e lê um caractere.
@@ -345,6 +854,8 @@
     - `attrs`: Os atributos a serem aplicados.
     - `color`: A cor a ser aplicada.
   - Retorna: Nenhum.
+
+## Funções de Atributos e Cores de Texto:
 
 - `mvwchgat(window, y, x, n, attrs, color)`:
   - Descrição: Move o cursor para a posição especificada na janela especificada e altera os atributos e a cor de caracteres.
@@ -700,82 +1211,6 @@
     - `n`: O número de caracteres a serem alterados.
     - `attrs`: Os novos atributos a serem aplicados.
     - `color`: A nova cor a ser aplicada.
-  - Retorna: Nenhum.
-
-## Funções de Janela de Entrada e Saída:
-
-- `wprintw(window, format, ...)`:
-  - Descrição: Imprime uma string formatada na janela especificada.
-  - Parâmetros:
-    - `window`: Um ponteiro para a janela.
-    - `format`: Uma string de formato.
-    - `...`: Argumentos opcionais para substituir os espaços reservados.
-  - Retorna: Nenhum.
-
-- `waddstr(window, str)`:
-  - Descrição: Adiciona uma string na posição atual do cursor na janela especificada.
-  - Parâmetros:
-    - `window`: Um ponteiro para a janela.
-    - `str`: A string a ser adicionada.
-  - Retorna: Nenhum.
-
-- `waddch(window, ch)`:
-  - Descrição: Adiciona um caractere na posição atual do cursor na janela especificada.
-  - Parâmetros:
-    - `window`: Um ponteiro para a janela.
-    - `ch`: O caractere a ser adicionado.
-  - Retorna: Nenhum.
-
-- `wscanw(window, format, ...)`:
-  - Descrição: Lê dados formatados do teclado na janela especificada.
-  - Parâmetros:
-    - `window`: Um ponteiro para a janela.
-    - `format`: Uma string de formato.
-    - `...`: Argumentos opcionais para armazenar os dados lidos.
-  - Retorna: Nenhum.
-
-- `wgetstr(window, str)`:
-  - Descrição: Lê uma string do teclado na janela especificada.**
-  - Parâmetros:
-    - `window`: Um ponteiro para a janela.
-    - `str`: Um ponteiro para um buffer de caracteres onde a string lida será armazenada.
-  - Retorna: Nenhum.
-
-- `wgetnstr(window, str, n)`:
-  - Descrição: Lê uma string do teclado na janela especificada, com um limite de comprimento especificado.
-  - Parâmetros:
-    - `window`: Um ponteiro para a janela.
-    - `str`: Um ponteiro para um buffer de caracteres onde a string lida será armazenada.
-    - `n`: O limite de comprimento para a string lida.
-  - Retorna: Nenhum.
-
-## Funções de Janela Diversas:
-
-- `wclear(window)`:
-  - Descrição: Limpa a janela especificada.
-  - Parâmetros:
-    - `window`: Um ponteiro para a janela.
-  - Retorna: Nenhum.
-
-- `wmove(window, y, x)`:
-  - Descrição: Move o cursor para a posição especificada na janela especificada.
-  - Parâmetros:
-    - `window`: Um ponteiro para a janela.
-    - `y`: A coordenada y (linha) para mover o cursor.
-    - `x`: A coordenada x (coluna) para mover o cursor.
-  - Retorna: Nenhum.
-
-- `wrefresh(window)`:
-  - Descrição: Atualiza a janela especificada, refletindo as alterações feitas.
-  - Parâmetros:
-    - `window`: Um ponteiro para a janela.
-  - Retorna: Nenhum.
-
-- `wborder(window, left, right, top, bottom, tl_corner, tr_corner, bl_corner, br_corner)`:
-  - Descrição: Desenha uma borda em torno da janela especificada com os caracteres especificados.
-  - Parâmetros:
-    - `window`: Um ponteiro para a janela.
-    - `left`: O caractere para a borda esquerda.
     - `right`: O caractere para a borda direita.
     - `top`: O caractere para a borda superior.
     - `bottom`: O caractere para a borda inferior.

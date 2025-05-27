@@ -189,7 +189,7 @@ buffer_t *http_post(const char *url, struct curl_slist *headers, cJSON *json) {
 buffer_t *api_url_search(const char *path, const char *query) {
     char *encoded_query = curl_easy_escape(NULL, query, strlen(query));
     char url[1024];
-    int needed = snprintf(url, sizeof(url), "%s/search/%s?q=%s&limit=100", API_URL, path, encoded_query);
+    int needed = snprintf(url, sizeof(url), "%s/search/%s?q=%s", API_URL, path, encoded_query);
     if (needed >= (int) sizeof(url)) {
         TRACE("Error building URL");
         free(encoded_query);

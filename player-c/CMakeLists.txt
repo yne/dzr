@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 4.0)
 project(PlayerC C)
 
 # Define o padrão C23
@@ -6,10 +6,10 @@ set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Define as flags de compilação para mostrar avisos e gerar símbolos de depuração
-add_compile_options(-Wall -Wextra -Wno-unused-parameter -Wno-unused-function) 
+add_compile_options(-Wall -Wextra) 
 
 # Define o diretório de saída para os binários
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 # Adiciona o diretório src/ para buscar os arquivos de código e cabeçalhos
 include_directories(src)
@@ -22,7 +22,7 @@ if(MSYS)
     find_library(MENU_LIBRARY NAMES menuw)
     find_library(PANEL_LIBRARY NAMES panelw)
 else()
-    find_package(Curses REQUIRED)
+    find_package(CURSES REQUIRED)
     
     find_library(NCURSES_LIBRARY NAMES ncursesw PATHS /usr/lib /usr/local/lib)
     find_library(MENU_LIBRARY NAMES menuw)
@@ -31,6 +31,8 @@ else()
     include_directories(${CURSES_INCLUDE_DIR})
 endif()
 # Busca explicitamente a biblioteca ncursesw e menu no Linux
+
+find_package(CJSON REQUIRED)
 
 # Busca manualmente os arquivos de cabeçalho e a biblioteca do cJSON
 find_path(CJSON_INCLUDE_DIR cjson/cJSON.h PATHS /usr/include /usr/local/include)
@@ -57,5 +59,9 @@ set(LIBRARIES ${NCURSES_LIBRARY} ${CURL_LIBRARIES} ${CJSON_LIBRARY} ${MENU_LIBRA
 MESSAGE(STATUS "Bibliotecas encontradas: ${LIBRARIES}")
 target_link_libraries(dzr ${LIBRARIES})
 
-add_custom_target(debug ./build/dzr 2>"./out.log" )
-add_custom_target(valgrind valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --verbose --log-file=valgrind-out.log ./build/dzr 2>"./out.log" )
+if(MSYS)
+    add_custom_target(debug ./dzr.exe 2>"./out.log" )
+else()
+    add_custom_target(debug ./dzr 2>"./out.log" )
+    add_custom_target(valgrind valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --verbose --log-file=valgrind-out.log ./dzr 2>"./out.log" )
+endif()
