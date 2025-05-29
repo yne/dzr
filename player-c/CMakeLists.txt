@@ -17,19 +17,13 @@ include_directories(src)
 # Busca as bibliotecas ncursesw e curl
 find_package(CURL REQUIRED)
 
-if(MSYS)
-    find_library(NCURSES_LIBRARY NAMES ncursesw PATHS /usr/lib /usr/local/lib)
-    find_library(MENU_LIBRARY NAMES menuw)
-    find_library(PANEL_LIBRARY NAMES panelw)
-else()
-    find_package(CURSES REQUIRED)
-    
-    find_library(NCURSES_LIBRARY NAMES ncursesw PATHS /usr/lib /usr/local/lib)
-    find_library(MENU_LIBRARY NAMES menuw)
-    find_library(PANEL_LIBRARY NAMES panelw)
+find_package(Curses REQUIRED)
 
-    include_directories(${CURSES_INCLUDE_DIR})
-endif()
+find_library(NCURSES_LIBRARY NAMES ncursesw PATHS /usr/lib /usr/local/lib)
+find_library(MENU_LIBRARY NAMES menuw)
+find_library(PANEL_LIBRARY NAMES panelw)
+
+include_directories(${CURSES_INCLUDE_DIR})
 # Busca explicitamente a biblioteca ncursesw e menu no Linux
 
 find_package(CJSON REQUIRED)

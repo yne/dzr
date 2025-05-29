@@ -1,36 +1,11 @@
 #include "dzr.h"
+#include "logging.h"
 #include "requests.h"
 
+#include <stdarg.h>
 #include <string.h>
+#include <vadefs.h>
 #include <wchar.h>
-
-typedef enum {
-    CTRL_D = 4,
-    COMMAND = ':',
-    UP = KEY_UP,
-    DOWN = KEY_DOWN,
-    LEFT = KEY_LEFT,
-    RIGHT = KEY_RIGHT,
-    ENTER = 10,
-    PAGE_UP = KEY_NPAGE,
-    PAGE_DOWN = KEY_PPAGE,
-    HOME = KEY_HOME,
-    END = KEY_END,
-    SELECT = ' ',
-
-    TRACK = 't',
-    ALBUM = 'b',
-    ARTIST = 'a',
-    PLAYLIST = 'p',
-    USER = 'u',
-    GENRE = 'g',
-    RADIO = 'r'
-} Commands;
-
-typedef struct {
-    Menu_Options on;
-    Menu_Options off;
-} Menu_Options_Seeting;
 
 int create_menu(window_t *w, Menu_Options_Seeting options);
 
@@ -54,11 +29,11 @@ int create_win(window_t *w);
 int free_window(window_t *w);
 int clear_and_write(window_t *w, char *str);
 
+int do_command(int ch, ...);
 // https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/windows.html
 // https://pubs.opengroup.org/onlinepubs/7908799/xcurses/intovix.html
 // http://graysoftinc.com/terminal-tricks/curses-windows-pads-and-panels
 // https://sploitfun.wordpress.com/2015/02/10/understanding-glibc-malloc
-
 
 int main(void) { // int argc, char **argv
 
@@ -118,53 +93,8 @@ int main(void) { // int argc, char **argv
     int ch;
     while ((ch = getch()) != CTRL_D) {
         TRACE("main: key: %d char: %c", ch, ch);
+        do_command(ch, painel_w);
         switch (ch) {
-            case UP: {
-                TRACE("main: up");
-                drive_menu(painel_w, REQ_UP_ITEM);
-                break;
-            }
-            case DOWN: {
-                TRACE("main: down");
-                drive_menu(painel_w, REQ_DOWN_ITEM);
-                break;
-            }
-            case PAGE_UP: {
-                TRACE("main: previous page");
-                drive_menu(painel_w, REQ_SCR_DPAGE);
-                break;
-            }
-            case PAGE_DOWN: {
-                TRACE("main: next page");
-                drive_menu(painel_w, REQ_SCR_UPAGE);
-                break;
-            }
-            case HOME: {
-                TRACE("main: home");
-                drive_menu(painel_w, REQ_FIRST_ITEM);
-                break;
-            }
-            case END: {
-                TRACE("main: end");
-                drive_menu(painel_w, REQ_LAST_ITEM);
-                break;
-            }
-            case LEFT: {
-                TRACE("main: left");
-                break;
-            }
-            case RIGHT: {
-                TRACE("main: right");
-                break;
-            }
-            case SELECT: {
-                TRACE("main: select");
-                ITEM *it = current_item(painel_w->menu);
-                int index = item_index(it);
-                TRACE("main: selecting item %d", index);
-                menu_driver(painel_w->menu, REQ_TOGGLE_ITEM);
-                break;
-            }
             case COMMAND: {
                 TRACE("main: command");
                 ch = getch();
@@ -313,10 +243,11 @@ int search_api(char *path, window_t *w) {
         return 1;    
     }
 
-    if(response_internal && response_internal->next){
-        response_data = http_get(response_internal->next);
+    if(strcmp(path, "MORE") == 0){
+        if(response_internal && response_internal->next){
+            response_data = http_get(response_internal->next);
+        }
     }else{
-
         char *input = search_input(path);
         TRACE("search_api: Searching for %s", input);
         if (!input || strlen(input) == 0) {
@@ -325,6 +256,7 @@ int search_api(char *path, window_t *w) {
         response_data = api_url_search(path, input);
         free(input);
     }
+
     
     if (!response_data) {
         TRACE("search_api: Error getting response data");
@@ -352,6 +284,7 @@ int search_api(char *path, window_t *w) {
         cJSON *next = cJSON_GetObjectItem(json, "next");
         if(next){
             char *next_url = cJSON_GetStringValue(next);
+            printf("%s", next_url);
             if(next_url){
                 if(response_internal->next){
                     free(response_internal->next);
@@ -465,13 +398,13 @@ int search_api(char *path, window_t *w) {
         items[i] = new_item(response_internal->items[i]->name, id_str);
     }
     if(response_internal->next){
-        items[i] = new_item("-- Next Page --", "NEXT_PAGE");
+        items[i] = new_item("-- MORE --", "MORE");
         i++;
     }
     items[i] = NULL;
 
     if(w->menu && w->items){
-        destroy_itens(w);
+        destroy_menu(w);
     }
     w->items = items;
     
@@ -481,12 +414,6 @@ int search_api(char *path, window_t *w) {
             .off = O_SHOWDESC
         };
         create_menu(w, setting);
-    }else{
-        int i = 0;
-        i = unpost_menu(w->menu);
-        i = set_menu_items(w->menu, w->items);
-        i = post_menu(w->menu);
-        TRACE("search_api: Menu updated %d", i);
     }
 
     
@@ -496,7 +423,6 @@ int search_api(char *path, window_t *w) {
     free(response_data);
     return 1;
 }
-
 
 char *int_to_string(char *format, int i) {
     int len = snprintf(NULL, 0, format ? format : "%d", i);
@@ -884,5 +810,122 @@ int free_window(window_t *w) {
     free(w);
 
     TRACE("free_window: Ended");
+    return OK;
+}
+
+
+// commands
+
+void up_command(va_list args){
+    TRACE("main: up");
+    window_t *painel_w  = va_arg(args, window_t *);
+    drive_menu(painel_w, REQ_UP_ITEM);
+}
+
+void down_command(va_list args){
+    TRACE("main: down");
+    window_t *painel_w  = va_arg(args, window_t *);
+    drive_menu(painel_w, REQ_DOWN_ITEM);
+}
+
+
+void page_up_command(va_list args){
+    TRACE("main: previous page");
+    window_t *painel_w  = va_arg(args, window_t *);
+    drive_menu(painel_w, REQ_SCR_DPAGE);
+}
+
+void page_down_command(va_list args){
+    TRACE("main: next page");
+    window_t *painel_w  = va_arg(args, window_t *);
+    drive_menu(painel_w, REQ_SCR_UPAGE);
+}
+
+void home_command(va_list args){
+    TRACE("main: home");
+    window_t *painel_w  = va_arg(args, window_t *);
+    drive_menu(painel_w, REQ_FIRST_ITEM);
+}
+
+void end_command(va_list args){
+    TRACE("main: end");
+    window_t *painel_w  = va_arg(args, window_t *);
+    drive_menu(painel_w, REQ_LAST_ITEM);
+}
+
+void left_command(va_list args){
+    TRACE("main: left %p", args);
+}
+
+void right_command(va_list args){
+    TRACE("main: right %p", args);
+}
+
+void select_command(va_list args){
+    
+    TRACE("main: select");
+    window_t *painel_w  = va_arg(args, window_t *);
+    ITEM *it = current_item(painel_w->menu);
+    const char *sel = item_description(it);
+    printf("%s", sel);
+    if(sel && strcmp(sel, "MORE") == 0){
+        TRACE("main: more");
+        if (!search_api("MORE", painel_w)) {
+            TRACE("main: Error searching more");
+        }
+    }else{
+        int index = item_index(it);
+        TRACE("main: selecting item %d", index);
+        menu_driver(painel_w->menu, REQ_TOGGLE_ITEM);
+    }
+
+}
+
+static command_t commands[] = {
+    {
+        UP, up_command, NULL
+    },
+    {
+        DOWN, down_command, NULL
+    },
+    {
+        PAGE_UP, page_up_command, NULL
+    },
+    {
+        PAGE_DOWN, page_down_command, NULL
+    },
+    {
+        HOME, home_command, NULL
+    },
+    {
+        END, end_command, NULL
+    },
+    {
+        LEFT, left_command, NULL
+    },
+    {
+        RIGHT, right_command, NULL
+    },
+    {
+        0, NULL, NULL
+    }
+};
+
+
+int do_command(int ch, ...){
+    TRACE("do_command init");
+    for(int i=0;; i++){
+        if(commands[i].key == 0){
+            TRACE("do_command end");
+            break;
+        }
+        if(commands[i].key == ch){
+            TRACE("do_command exec");
+            va_list args;
+            va_start(args);
+            commands[i].func(args);
+            va_end(args);
+        }
+    }
     return OK;
 }
