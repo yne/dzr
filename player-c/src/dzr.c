@@ -30,6 +30,27 @@ int free_window(window_t *w);
 int clear_and_write(window_t *w, char *str);
 
 int do_command(int ch, ...);
+
+char *type_search(char ch){
+    switch (ch) {
+        case 't':
+            return "track";
+        case 'b':
+            return "album";
+        case 'a':
+            return "artist";
+        case 'p':
+            return "playlist";
+        case 'u':
+            return "user";
+        case 'g':
+            return "genre";
+        case 'r':
+            return "radio";
+        default:
+            return "none";
+    }
+}
 // https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/windows.html
 // https://pubs.opengroup.org/onlinepubs/7908799/xcurses/intovix.html
 // http://graysoftinc.com/terminal-tricks/curses-windows-pads-and-panels
@@ -94,59 +115,7 @@ int main(void) { // int argc, char **argv
     while ((ch = getch()) != CTRL_D) {
         TRACE("main: key: %d char: %c", ch, ch);
         do_command(ch, painel_w);
-        switch (ch) {
-            case COMMAND: {
-                TRACE("main: command");
-                ch = getch();
-                switch (ch) {
-                    case TRACK: {
-                        TRACE("main: track");
-                        if (!search_api("track", painel_w)) {
-                            TRACE("main: Error searching track");
-                        }
-                        break;
-                    }
-                    case ARTIST: {
-                        TRACE("main: artist");
-                        if (!search_api("artist", painel_w)) {
-                            TRACE("main: Error searching track");
-                        }
-                        break;
-                    }
-                    case ALBUM: {
-                        TRACE("main: album");
-                        if (!search_api("album", painel_w)) {
-                            TRACE("main: Error searching track");
-                        }
-                        break;
-                    }
-                    case PLAYLIST: {
-                        TRACE("main: playlist");
-                        if (!search_api("playlist", painel_w)) {
-                            TRACE("main: Error searching track");
-                        }
-                        break;
-                    }
-                    case USER: {
-                        TRACE("main: user");
-                        TRACE("main: Not implemented");
-                        break;
-                    }
-                    case RADIO: {
-                        TRACE("main: radio");
-                        TRACE("main: Not implemented");
-                        break;
-                    }
-                    default: {
-                        TRACE("main: invalid");
-                        break;
-                    }
-                }
-                break;
-            }
-            default:
-                break;
-        }
+
         TRACE("main: updating panels");
         update_panels();
 
@@ -867,7 +836,6 @@ void select_command(va_list args){
     window_t *painel_w  = va_arg(args, window_t *);
     ITEM *it = current_item(painel_w->menu);
     const char *sel = item_description(it);
-    printf("%s", sel);
     if(sel && strcmp(sel, "MORE") == 0){
         TRACE("main: more");
         if (!search_api("MORE", painel_w)) {
@@ -881,33 +849,49 @@ void select_command(va_list args){
 
 }
 
+void search(va_list args){
+     TRACE("main: search");
+    window_t *painel_w  = va_arg(args, window_t *);
+    int ch = getch();
+    char * type = type_search(ch);
+    TRACE("main: %s", type);
+    if(ch == 't' || ch == 'b' || ch == 'a' || ch == 'p'){
+        if (!search_api(type, painel_w)) {
+            TRACE("main: Error searching track");
+        }
+    }
+}
+
 static command_t commands[] = {
     {
-        UP, up_command, NULL
+        UP, up_command
     },
     {
-        DOWN, down_command, NULL
+        DOWN, down_command
     },
     {
-        PAGE_UP, page_up_command, NULL
+        PAGE_UP, page_up_command
     },
     {
-        PAGE_DOWN, page_down_command, NULL
+        PAGE_DOWN, page_down_command
     },
     {
-        HOME, home_command, NULL
+        HOME, home_command
     },
     {
-        END, end_command, NULL
+        END, end_command
     },
     {
-        LEFT, left_command, NULL
+        LEFT, left_command
     },
     {
-        RIGHT, right_command, NULL
+        RIGHT, right_command
     },
     {
-        0, NULL, NULL
+        COMMAND, search
+    },
+    {
+        0, NULL
     }
 };
 
@@ -919,7 +903,7 @@ int do_command(int ch, ...){
             TRACE("do_command end");
             break;
         }
-        if(commands[i].key == ch){
+        if(commands[i].key == ch ){
             TRACE("do_command exec");
             va_list args;
             va_start(args);

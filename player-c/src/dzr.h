@@ -36,7 +36,6 @@ typedef struct {
 typedef struct command_t {
     int key;
     void (* func)(va_list args);
-    struct command_t *subcommand;
 } command_t; 
 
 static inline void init_curses() {
@@ -62,11 +61,5 @@ static inline void init_curses() {
 #define END KEY_END
 #define SELECT ' '
 
-#define TRACK 't'
-#define ALBUM 'b'
-#define ARTIST 'a'
-#define PLAYLIST 'p'
-#define USER 'u'
-#define GENRE 'g'
-#define RADIO 'r'
+
 #endif // DZR_H
