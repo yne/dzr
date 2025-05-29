@@ -56,10 +56,20 @@ char *type_search(char ch){
 // http://graysoftinc.com/terminal-tricks/curses-windows-pads-and-panels
 // https://sploitfun.wordpress.com/2015/02/10/understanding-glibc-malloc
 
-int main(void) { // int argc, char **argv
+int main(int argc, char **argv) {
 
     TRACE("main: entering");
-    init_curses();
+
+    for(int i =0; i < argc; i++){
+        TRACE("argument %d: %s", i, argv[i]);
+    }
+
+    initscr();
+    noecho();
+    raw();
+    keypad(stdscr, TRUE);
+    setlocale(LC_ALL, "US");
+    TRACE("Curses initialized ...");
     
     int yMax = getmaxy(stdscr);
     int xMax = getmaxx(stdscr);
@@ -198,12 +208,18 @@ int search_api(char *path, window_t *w) {
     buffer_t *response_data = NULL;
 
     if(response_internal->path && strcmp(path, response_internal->path) != 0){
-        response_internal->cur_size = 0;
-        response_internal->path = path;
-        response_internal->next = NULL;
-        if (w->items != NULL || w->menu != NULL) {
-            TRACE("search_api: Resetting menu");
-            destroy_menu(w);
+        if(strcmp(path, "MORE") == 0){
+            if(response_internal && response_internal->next){
+                response_data = http_get(response_internal->next);
+            }
+        }else{
+            response_internal->cur_size = 0;
+            response_internal->path = path;
+            response_internal->next = NULL;
+            if (w->items != NULL || w->menu != NULL) {
+                TRACE("search_api: Resetting menu");
+                destroy_menu(w);
+            }
         }
     }
     
@@ -212,11 +228,7 @@ int search_api(char *path, window_t *w) {
         return 1;    
     }
 
-    if(strcmp(path, "MORE") == 0){
-        if(response_internal && response_internal->next){
-            response_data = http_get(response_internal->next);
-        }
-    }else{
+    if (!response_data) { 
         char *input = search_input(path);
         TRACE("search_api: Searching for %s", input);
         if (!input || strlen(input) == 0) {
@@ -886,6 +898,9 @@ static command_t commands[] = {
     },
     {
         RIGHT, right_command
+    },
+    {
+        SELECT, select_command
     },
     {
         COMMAND, search

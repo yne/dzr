@@ -38,16 +38,6 @@ typedef struct command_t {
     void (* func)(va_list args);
 } command_t; 
 
-static inline void init_curses() {
-  initscr();
-  noecho();
-  raw();
-  keypad(stdscr, TRUE);
-  setlocale(LC_ALL, "");
-  TRACE("Curses initialized ...");
-}
-
-
 #define CTRL_D  4
 #define COMMAND  ':'
 #define UP KEY_UP
