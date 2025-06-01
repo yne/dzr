@@ -28,7 +28,11 @@ if [ -z "$DZR_CBC" ]; then
 	sleep 2 # give time to read the warning
 	echo
 fi
-
+if [ -z "$DZR_ARL" ]; then
+	printf "Starting 2025-03-08 Deezer has blocked anonymous playback."
+	printf "You shall export DZR_ARL variable to make the playback work."
+	printf "See: https://github.com/yne/dzr/issues/45#issuecomment-2927621999"
+fi
 # dependencies check, see: https://github.com/yne/dzr/issues/12
 for c in jq curl dialog openssl $(echo "$PLAYER" | cut -f 1 -d " "); do
 	command -v $c >/dev/null || { echo "$c is required" 1>&2 ; UNMET_DEPENDENCIES=1;}

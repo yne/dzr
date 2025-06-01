@@ -6,7 +6,7 @@ SNG_IDS=$(printf "%s" "$*" | sed 's/ /,/g')
 FETCH=${FETCH:-curl -s} # FETCH="wget -q -O -" or FETCH="curl -s -k"
 gw () {
   method="$1"; session="$2" ;apiToken="$3" ; shift 3 # curl args ...
-  $FETCH "https://www.deezer.com/ajax/gw-light.php?method=$method&input=3&api_version=1.0&api_token=$apiToken" --header "Cookie: sid=$session" "$@"
+  $FETCH "https://www.deezer.com/ajax/gw-light.php?method=$method&input=3&api_version=1.0&api_token=$apiToken" --header "Cookie: sid=$session; arl=$DZR_ARL" "$@"
 }
 
 [ -z "$SNG_IDS" ] && echo "USAGE: dzr-url 5404528,664107" && exit 1
