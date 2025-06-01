@@ -29,9 +29,23 @@ if [ -z "$DZR_CBC" ]; then
 	echo
 fi
 if [ -z "$DZR_ARL" ]; then
-	printf "Starting 2025-03-08 Deezer has blocked anonymous playback."
-	printf "You shall export DZR_ARL variable to make the playback work."
-	printf "See: https://github.com/yne/dzr/issues/45#issuecomment-2927621999"
+	echo "Starting on 2025-03-08, Anonymous playback are blocked."
+	echo "To authenticate DZR to your account:"
+	echo "- Sign in/up to https://www.deezer.com/"
+	echo "- Then open https://www.deezer.com/desktop/login/electron/callback"
+	echo "- Right click on the 'Open' button, then 'copy link address'."
+	while true; do
+		echo "past the deezer:// link here:"
+		read DZR_ARL
+		export DZR_ARL=$(printf $DZR_ARL | cut -d'/' -f4)
+		echo "$DZR_ARL" | grep -q '^[0-9a-f]\+$' && break;
+		echo "Invalid ARL format (expect: ^[0-9a-f]+$):"
+		echo $DZR_ARL
+	done
+	printf "To skip this message, add the following line to your shell profile (e.g. ~/.profile or ~/.zshrc):\n" >&2
+	echo "    export DZR_ARL=$DZR_ARL"
+	sleep 2 # give time to read the warning
+	echo
 fi
 # dependencies check, see: https://github.com/yne/dzr/issues/12
 for c in jq curl dialog openssl $(echo "$PLAYER" | cut -f 1 -d " "); do
