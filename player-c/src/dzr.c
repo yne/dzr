@@ -2,10 +2,14 @@
 #include "logging.h"
 #include "requests.h"
 
+#include <ncursesw/menu.h>
 #include <stdarg.h>
 #include <string.h>
 #include <vadefs.h>
 #include <wchar.h>
+#include <locale.h>
+
+int update_menu(window_t *w, ITEM ** items);
 
 int create_menu(window_t *w, Menu_Options_Seeting options);
 
@@ -60,7 +64,7 @@ int main(int argc, char **argv) {
 
     TRACE("main: entering");
 
-    for(int i =0; i < argc; i++){
+    for(int i = 0; i < argc; i++){
         TRACE("argument %d: %s", i, argv[i]);
     }
 
@@ -73,11 +77,6 @@ int main(int argc, char **argv) {
     
     int yMax = getmaxy(stdscr);
     int xMax = getmaxx(stdscr);
-
-    // Menu_Options_Seeting playlist_options = {
-    //     .on = O_ONEVALUE,
-    //     .off = O_SHOWDESC
-    // };
 
     window_t *playlist_w = malloc(sizeof(window_t));
     strcpy(playlist_w->label, "Playlist");
@@ -265,7 +264,6 @@ int search_api(char *path, window_t *w) {
         cJSON *next = cJSON_GetObjectItem(json, "next");
         if(next){
             char *next_url = cJSON_GetStringValue(next);
-            printf("%s", next_url);
             if(next_url){
                 if(response_internal->next){
                     free(response_internal->next);
@@ -336,7 +334,7 @@ int search_api(char *path, window_t *w) {
             cJSON *c_nb_tracks = cJSON_GetObjectItem(c_item, "nb_tracks");
             CHECK(c_nb_tracks);
             int nb_tracks = (int)cJSON_GetNumberValue(c_nb_tracks);
-            char *nb_tracks_str = int_to_string(" (%d)", nb_tracks);
+            char *nb_tracks_str = int_to_string("(%d)", nb_tracks);
             CHECK(nb_tracks_str);
             names.nb_tracks = malloc(strlen(nb_tracks_str) + 1);
             strcpy(names.nb_tracks, nb_tracks_str);
@@ -351,8 +349,9 @@ int search_api(char *path, window_t *w) {
             strcat(name_item, names.title);
         }
         if(names.title && names.nb_tracks){ // Title (nb_tracks)
-            name_item = calloc(strlen(names.title) + strlen(names.nb_tracks) + 1, sizeof(char));
+            name_item = calloc(strlen(names.title) + strlen(names.nb_tracks) + strlen(" ") + 1, sizeof(char));
             strcat(name_item, names.title);
+            strcat(name_item, " ");
             strcat(name_item, names.nb_tracks);
         }
         
@@ -378,26 +377,15 @@ int search_api(char *path, window_t *w) {
         char * id_str = int_to_string(NULL, response_internal->items[i]->id);
         items[i] = new_item(response_internal->items[i]->name, id_str);
     }
-    if(response_internal->next){
-        items[i] = new_item("-- MORE --", "MORE");
-        i++;
+    if (!(response_internal->cur_size > 0 && response_internal->total > 0 && response_internal->cur_size > response_internal->total - 1)) {
+        if(response_internal->next){
+            items[i] = new_item("-- MORE --", "MORE");
+            i++;
+        }
     }
     items[i] = NULL;
 
-    if(w->menu && w->items){
-        destroy_menu(w);
-    }
-    w->items = items;
-    
-    if(!w->menu){
-        Menu_Options_Seeting setting = {
-            .on = O_ONEVALUE,
-            .off = O_SHOWDESC
-        };
-        create_menu(w, setting);
-    }
-
-    
+    update_menu(w, items);
 
     cJSON_Delete(json);
     free(response_data->data);
@@ -572,6 +560,34 @@ char *filter_chars(char *input_string) {
     }
 
     return input_string;
+}
+
+int update_menu(window_t *w, ITEM ** items){
+    if(w == NULL){
+        TRACE("update_menu: unable update menu");
+        return ERR;
+    }
+    if(w->menu && w->items){
+        TRACE("update_menu: destroying menu");
+        if(destroy_menu(w) != OK){
+            TRACE("update_menu: error create menu");
+            return ERR;
+        };
+    }
+    TRACE("update_menu: setting new items");
+    w->items = items;
+    
+
+    TRACE("update_menu: creating menu");
+    if(create_menu(w, GLOBAL_MENU_OPTIONS) != OK){
+        TRACE("update_menu: error create menu");
+        return ERR;
+    };
+    if(w->menu == NULL){
+        TRACE("update_menu: menu doesn't exist");
+        return ERR;
+    }
+    return OK;
 }
 
 int create_win(window_t *w) {
@@ -794,7 +810,6 @@ int free_window(window_t *w) {
     return OK;
 }
 
-
 // commands
 
 void up_command(va_list args){
@@ -808,7 +823,6 @@ void down_command(va_list args){
     window_t *painel_w  = va_arg(args, window_t *);
     drive_menu(painel_w, REQ_DOWN_ITEM);
 }
-
 
 void page_up_command(va_list args){
     TRACE("main: previous page");
@@ -856,7 +870,8 @@ void select_command(va_list args){
     }else{
         int index = item_index(it);
         TRACE("main: selecting item %d", index);
-        menu_driver(painel_w->menu, REQ_TOGGLE_ITEM);
+        int i = menu_driver(painel_w->menu, REQ_TOGGLE_ITEM);
+        TRACE("res %d", i);
     }
 
 }

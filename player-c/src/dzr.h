@@ -11,10 +11,6 @@
   #include <ncursesw/panel.h>
 #endif
 
-#include <locale.h>
-
-#include "logging.h"
-
 
 typedef struct window_t {
   WINDOW *window;
@@ -32,6 +28,16 @@ typedef struct {
     Menu_Options on;
     Menu_Options off;
 } Menu_Options_Seeting;
+
+const Menu_Options_Seeting GLOBAL_MENU_OPTIONS = {
+  .on = O_NONCYCLIC,
+  .off = O_SHOWDESC | O_ONEVALUE
+};
+
+const Menu_Options_Seeting GLOBAL_PLAYLIST_OPTIONS = {
+  .on = O_ONEVALUE | O_NONCYCLIC,
+  .off = O_SHOWDESC
+};
 
 typedef struct command_t {
     int key;
