@@ -2,7 +2,7 @@
 	"name": "dzr",
 	"displayName": "DZR player",
 	"description": "deezer.com player",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"publisher": "yne",
 	"engines": {
 		"vscode": "^1.73.0"
@@ -190,6 +190,11 @@
 					"type": "string",
 					"default": "",
 					"description": "track decryption key"
+				},
+				"dzr.arl": {
+					"type": "string",
+					"default": "",
+					"description": "Access Rights Locator"
 				},
 				"dzr.secure": {
 					"type": "boolean",

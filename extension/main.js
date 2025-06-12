@@ -1,4 +1,6 @@
-/**@type import('vscode') */ // soon: https://devblogs.microsoft.com/typescript/announcing-typescript-5-5-rc/#type-imports-in-jsdoc
+// @ts-check
+/// curl -Ok https://raw.githubusercontent.com/microsoft/vscode/main/src/vscode-dts/vscode.d.ts
+/// <reference path="./vscode.d.ts" />
 const vscode = require("vscode");
 const crypto = require('crypto');
 const https = require('https');
@@ -8,6 +10,7 @@ const hhmmss = (s) => (new Date(s * 1000)).toISOString().slice(11, 19).replace(/
 const wait = (ms = 1000) => new Promise(resolve => setTimeout(resolve, ms));
 // still no fetch() in 2023 ?
 const fetch = (url, opt, data) => new Promise((resolve, reject) => {
+	console.log({ url, opt, data })
 	const chunks = [], req = https.request(url, { rejectUnauthorized: conf().get('secure'), ...opt }, res => {
 		res.on('data', chunk => chunks.push(chunk));
 		res.on('end', () => resolve(Buffer.concat(chunks)));
@@ -57,23 +60,36 @@ async function browse(url_or_event_or_ids, label) {
 		}
 	} catch (e) { console.error(e) }
 }
-const with_url = async (songs) => songs?.length ? await vscode.window.withProgress({ title: 'Fetching Song Info...', location }, async (progress) => {
+let DZR_PNG, USR_NFO;
+const with_url = async (songs) => songs?.length ? await vscode.window.withProgress({ title: 'Fetching', location }, async (progress) => {
 	try { // take 7s (with, or without agent)
-		const next = (val) => (progress.report({ increment: 100 / 4 }), val);
-		const gw = async (method, sid, api_token = "", opt = {}, data) => JSON.parse(await fetch(`${base}&method=${method}&api_token=${api_token}`,
-			{ ...opt, headers: { Cookie: `sid=${sid}`, ...opt?.headers } }, data)).results;
-		const base = next("https://www.deezer.com/ajax/gw-light.php?input=3&api_version=1.0");
-		const DZR_PNG = next(await gw('deezer.ping'));
-		const USR_NFO = next(await gw('deezer.getUserData', DZR_PNG.SESSION));
-		const SNG_NFO = next(await gw('song.getListData', DZR_PNG.SESSION, USR_NFO.checkForm, { method: 'POST' }, JSON.stringify({ sng_ids: songs.map(s => s.id) }))).data.map(e => e.FALLBACK || e);
-		next(JSON.parse(await fetch('https://media.deezer.com/v1/get_url', { method: 'POST' }, JSON.stringify({
+		const next = (message, val) => (progress.report({ increment: 100 / 4, message }), val);
+		const gw = async (method, arl, sid, api_token = "", opt = {}, data) => JSON.parse(await fetch(`${base}&method=${method}&api_token=${api_token}`,
+			{ ...opt, headers: { Cookie: `sid=${sid}; arl=${arl}`, ...opt?.headers } }, data)).results;
+		const base = "https://www.deezer.com/ajax/gw-light.php?input=3&api_version=1.0";
+		let DZR_ARL = next("ARL", conf().get('arl'));
+		if (!DZR_ARL) {
+			DZR_ARL = (await vscode.window.showInputBox({
+				ignoreFocusOut: true,
+				placeHolder: "deezer://autolog/xxxx",
+				prompt: "Login on [deezer.com](https://www.deezer.com/), then copy the button address displayed on [this page](https://www.deezer.com/desktop/login/electron/callback)"
+			}))?.match(/[0-9a-f]{192}/);
+			conf().update('arl', DZR_ARL, vscode.ConfigurationTarget.Global)
+		}
+		DZR_PNG = next("session", DZR_PNG || await gw('deezer.ping', DZR_ARL));
+		USR_NFO = next("user right", USR_NFO || await gw('deezer.getUserData', DZR_ARL, DZR_PNG.SESSION));
+		const SNG_NFO = next("song info", await gw('song.getListData', DZR_ARL, DZR_PNG.SESSION, USR_NFO.checkForm, { method: 'POST' }, JSON.stringify({ sng_ids: songs.map(s => s.id) }))).data.map(e => e.FALLBACK || e);
+		const GET_URL = next("song stream", JSON.parse(await fetch('https://media.deezer.com/v1/get_url', { method: 'POST' }, JSON.stringify({
 			track_tokens: SNG_NFO.map(d => d.TRACK_TOKEN),
 			license_token: USR_NFO.USER.OPTIONS.license_token,
 			media: [{ type: "FULL", formats: [{ cipher: "BF_CBC_STRIPE", format: "MP3_128" }] }]
-		})))).data.map((url, i) => Object.assign(SNG_NFO[i], url));
+		}))))?.data?.map((url, i) => Object.assign(SNG_NFO[i], url));
 		const errors = SNG_NFO.filter(e => e.errors).map(e => `[${e.SNG_ID}] ${e.ART_NAME} - ${e.SNG_TITLE}:${JSON.stringify(e.errors)}`);
 		const skiped = SNG_NFO.filter(s => !s.media?.[0]?.sources?.[0]?.url).map(e => `[${e.SNG_ID}] no MEDIA`);
-		if (errors.length || skiped.length) vscode.window.showWarningMessage([...errors, ...skiped].join('\n'));
+		if (errors.length || skiped.length) {
+			vscode.window.showWarningMessage([...errors, ...skiped].join('\n'), "Flush ARL", "Continue")
+				.then(e => { if (e == "Flush ARL") conf().update('arl', undefined, vscode.ConfigurationTarget.Global) });
+		}
 		return SNG_NFO.map(nfo => ({
 			id: nfo.SNG_ID,
 			md5_image: nfo.ALB_PICTURE,
@@ -101,15 +117,17 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 		item.show();
 		return item;
 	});
+	/**@type {vscode.WebviewPanel|null}*/
 	panel = null;
 	#state = {};
 	state = new Proxy(this.#state, {
-		set: (target, key, value) => {
+		set: (target, k, value) => {
+			const key = String(k);
 			target[key] = value;
 			if (['queue', 'looping'].includes(key)) { // persist those values across reboot
 				conf().update(key, value, vscode.ConfigurationTarget.Global);
 			}
-			if (key == 'queue') this._onDidChangeTreeData.fire();
+			if (key == 'queue') this._onDidChangeTreeData.fire(null);
 			vscode.commands.executeCommand('setContext', `dzr.${key}`, value);
 			this.post('state', target, [key]);
 			this.renderStatus();
@@ -129,9 +147,10 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 		this.statuses[0].text = this.state.ready && (this.state.playing ? "$(debug-pause)" : "$(play)");
 		this.statuses[1].tooltip = this.state.ready ? label : "Initiate interaction first";
 		this.statuses[1].text = this.state.ready ? label.length < 20 ? label : (label.slice(0, 20) + '…') : "$(play)"
-		this.statuses[2].text = this.state.ready && this.state.queue.length ? `${index + 1 || '?'}/${this.state.queue.length} $(chevron-right)` : null;//debug-step-over
-		this.treeView.description = (this.state.queue?.length ? `${index + 1 || '?'}/${this.state.queue.length}` : '') + ` loop:${this.state.looping}`;
-		this.treeView.message = this.state.queue?.length ? null : "Empty Queue. Add tracks from the '+' menu";
+		this.statuses[2].text = this.state.ready && this.state.queue.length ? `${index + 1 || '?'}/${this.state.queue.length} $(chevron-right)` : '';//debug-step-over
+		this.treeView.title = (this.state.queue?.length ? `${index + 1 || '?'}/${this.state.queue.length}` : '') + ` loop:${this.state.looping}`;
+		this.treeView.message = this.state.queue?.length ? "" : "Empty Queue. Add tracks from the '+' menu";
+		this.treeView.badge = { tooltip: label, value: this.state.playing ? index + 1 : 0 }
 	}
 	async show(htmlUri, iconPath) {
 		if (this.panel) return this.panel.reveal(vscode.ViewColumn.One);
@@ -168,15 +187,20 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 	onDidChangeTreeData = this._onDidChangeTreeData.event;
 	/**@type {import('vscode').TreeView}*/
 	treeView = vscode.window.createTreeView('dzr.queue', { treeDataProvider: this, dragAndDropController: this, canSelectMany: true });
+	highlighted = (label, active) => ({ label, highlights:/**@type {[number, number][]}*/(active ? [[0, label.length]] : []) })
 	/**@returns {vscode.TreeItem} */
 	getTreeItem = (item) => ({
 		iconPath: new vscode.ThemeIcon("music"),
-		label: item.title + ' - ' + item.artists.map(a => a.name).join(),
+		label: this.highlighted(item.title + ' - ' + item.artists.map(a => a.name).join(), item == this.state.current),
 		description: hhmmss(item.duration || 0) + " " + (item.version || ''),
 		contextValue: 'dzr.track',
 		command: { title: 'Play', command: 'dzr.load', tooltip: 'Play', arguments: [this.state.queue.indexOf(item)] },
 	})
-	getChildren = () => this.state.queue
+	getParent = () => null
+	getChildren = () => {
+
+		return this.state.queue
+	}
 	async handleDrag(sources, treeDataTransfer) {
 		treeDataTransfer.set(this.dropMimeTypes[0], new vscode.DataTransferItem(sources));
 	}
@@ -208,7 +232,7 @@ exports.activate = async function (/**@type {import('vscode').ExtensionContext}*
 
 	context.subscriptions.push(...dzr.statuses, dzr.treeView,
 		// catch vscode://yne.dzr/* urls
-		vscode.window.registerUriHandler({ handleUri(uri) { (({ path, query }) => vscode.commands.executeCommand(`dzr.${path.slice(1)}`, ...(query ? JSON.parse(query) : [])))(vscode.Uri.parse(uri)); } }),
+		vscode.window.registerUriHandler({ handleUri(uri) { (({ path, query }) => vscode.commands.executeCommand(`dzr.${path.slice(1)}`, ...(query ? JSON.parse(query) : [])))(uri); } }),
 		vscode.commands.registerCommand('dzr.show', () => dzr.show(htmlUri, iconUri)),
 		vscode.commands.registerCommand("dzr.play", () => dzr.post('play')),
 		vscode.commands.registerCommand("dzr.pause", () => dzr.post('pause')),
@@ -223,7 +247,7 @@ exports.activate = async function (/**@type {import('vscode').ExtensionContext}*
 		vscode.commands.registerCommand("dzr.shareAll", async () => vscode.commands.executeCommand("dzr.share")),
 		vscode.commands.registerCommand("dzr.share", async (track, tracks) => {
 			const ids = JSON.stringify(track ? [(tracks || [track]).map(e => e.id || track.id)] : [dzr.state.queue.map(q => q.id)]);
-			vscode.env.clipboard.writeText(new vscode.Uri("vscode", context.extension.id, '/add', ids).toString())
+			vscode.env.clipboard.writeText(vscode.Uri.from({ scheme: "vscode", authority: context.extension.id, path: '/add', query: ids }).toString())
 		}),
 		vscode.commands.registerCommand("dzr.shuffle", async () => {
 			const shuffle = [...dzr.state.queue];
@@ -243,10 +267,13 @@ exports.activate = async function (/**@type {import('vscode').ExtensionContext}*
 				vscode.commands.executeCommand('dzr.show');
 				while (!dzr.state.ready) await wait();
 			}
-			if ((dzr.state.queue[pos].expire || 0) < (new Date() / 1000)) {
+			if ((dzr.state.queue[pos].expire || 0) < (+new Date() / 1000)) {
 				dzr.state.queue = await with_url(dzr.state.queue);//TODO: hope item is now up to date
 			}
+			const prev = dzr.state?.current;
 			dzr.state.current = dzr.state.queue[pos];
+			dzr._onDidChangeTreeData.fire(prev);
+			dzr._onDidChangeTreeData.fire(this.state?.current);
 			const hex = (str) => str.split('').map(c => c.charCodeAt(0))
 			const md5 = hex(crypto.createHash('md5').update(`${dzr.state.current.id}`).digest('hex'));
 			const key = Buffer.from(hex(conf().get('cbc')).map((c, i) => c ^ md5[i] ^ md5[i + 16]));
