@@ -2,20 +2,25 @@
 #include "logging.h"
 #include "requests.h"
 
+#include <ncursesw/curses.h>
 #include <ncursesw/menu.h>
+#include <ncursesw/panel.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <string.h>
 #include <vadefs.h>
 #include <wchar.h>
 #include <locale.h>
 
+ITEM ** selected_items = NULL; 
+
 int update_menu(window_t *w, ITEM ** items);
 
-int create_menu(window_t *w, Menu_Options_Seeting options);
+int create_menu(window_t *w, ITEM ** items, Menu_Options_t options);
 
 int destroy_menu(window_t *w);
 
-int destroy_itens(window_t *w);
+int destroy_items(ITEM ** items);
 
 int drive_menu(window_t *w, int key);
 
@@ -67,7 +72,7 @@ int main(int argc, char **argv) {
     for(int i = 0; i < argc; i++){
         TRACE("argument %d: %s", i, argv[i]);
     }
-
+    
     initscr();
     noecho();
     raw();
@@ -86,7 +91,6 @@ int main(int argc, char **argv) {
     playlist_w->starty = 0;
     playlist_w->startx = 0;
     playlist_w->menu = NULL;
-    playlist_w->items = NULL;
     
     window_t *painel_w = malloc(sizeof(window_t));
 
@@ -97,7 +101,6 @@ int main(int argc, char **argv) {
     painel_w->starty = 0;
     painel_w->startx = playlist_w->x;
     painel_w->menu = NULL;
-    painel_w->items = NULL;
 
     TRACE("main: creating playlist window");
     if(create_win(playlist_w) != OK){
@@ -215,7 +218,7 @@ int search_api(char *path, window_t *w) {
             response_internal->cur_size = 0;
             response_internal->path = path;
             response_internal->next = NULL;
-            if (w->items != NULL || w->menu != NULL) {
+            if (w->menu != NULL) {
                 TRACE("search_api: Resetting menu");
                 destroy_menu(w);
             }
@@ -379,6 +382,7 @@ int search_api(char *path, window_t *w) {
     }
     if (!(response_internal->cur_size > 0 && response_internal->total > 0 && response_internal->cur_size > response_internal->total - 1)) {
         if(response_internal->next){
+
             items[i] = new_item("-- MORE --", "MORE");
             i++;
         }
@@ -401,32 +405,38 @@ char *int_to_string(char *format, int i) {
 }
 
 int clear_and_write(window_t *w, char *str) {
-    if (w == NULL || w->window == NULL) {
+    if (w == NULL) {
         TRACE("Invalid parameters in clear_and_write");
         return ERR;
     }
 
+    WINDOW *window = panel_window(w->panel);
+    if( window == NULL){
+        TRACE("window is null");
+        return ERR;
+    }
+
     TRACE("Clearing window in clear_and_write");
-    if (wclear(w->window) != OK) {
+    if (wclear(window) != OK) {
         TRACE("Error clearing window in clear_and_write");
         return ERR;
     }
 
     TRACE("Drawing box in clear_and_write");
-    if (box(w->window, 0, 0) != OK) {
+    if (box(window, 0, 0) != OK) {
         TRACE("Error drawing box in clear_and_write");
         return ERR;
     }
 
     TRACE("Adding label in clear_and_write");
-    if(addLabel(w->window, w->label) != OK){
+    if(addLabel(window, w->label) != OK){
         TRACE("Error adding label in clear_and_write");
         return ERR;
     }
 
     if(str && strlen(str) > 0){
         TRACE("Adding string in clear_and_write");
-        if (mvwaddstr(w->window, 1, 3, str) != OK) {
+        if (mvwaddstr(window, 1, 3, str) != OK) {
             TRACE("Error adding string in clear_and_write");
             return ERR;
         }
@@ -567,19 +577,16 @@ int update_menu(window_t *w, ITEM ** items){
         TRACE("update_menu: unable update menu");
         return ERR;
     }
-    if(w->menu && w->items){
+    if(w->menu){
         TRACE("update_menu: destroying menu");
         if(destroy_menu(w) != OK){
             TRACE("update_menu: error create menu");
             return ERR;
         };
     }
-    TRACE("update_menu: setting new items");
-    w->items = items;
-    
 
     TRACE("update_menu: creating menu");
-    if(create_menu(w, GLOBAL_MENU_OPTIONS) != OK){
+    if(create_menu(w, items, GLOBAL_MENU_OPTIONS) != OK){
         TRACE("update_menu: error create menu");
         return ERR;
     };
@@ -592,26 +599,26 @@ int update_menu(window_t *w, ITEM ** items){
 
 int create_win(window_t *w) {
     TRACE("create_win: Creating window");
-    w->window = newwin(w->y, w->x, w->starty, w->startx);
-    if (!w->window) {
+    WINDOW *window = newwin(w->y, w->x, w->starty, w->startx);
+    if (!window) {
         TRACE("create_win: Unable to create window");
         return ERR;
     }
 
     TRACE("create_win: Drawing box in window");
-    if (box(w->window, 0, 0) != OK) {
+    if (box(window, 0, 0) != OK) {
         TRACE("create_win: Error drawing box");
         return ERR;
     }
 
     TRACE("create_win: Adding label to window");
-    if (addLabel(w->window, w->label) != OK) {
+    if (addLabel(window, w->label) != OK) {
         TRACE("create_win: Error adding label");
         return ERR;
     }
 
     TRACE("create_win: Creating panel for window");
-    w->panel = new_panel(w->window);
+    w->panel = new_panel(window);
     if (!w->panel) {
         TRACE("create_win: Error creating panel");
         return ERR;
@@ -662,6 +669,8 @@ int destroy_menu(window_t *w) {
         TRACE("destroy_menu: Error unposting menu");
         return ERR;
     }
+    
+    ITEM ** items = menu_items(w->menu);
 
     TRACE("destroy_menu: Freeing menu");
     if (free_menu(w->menu) != E_OK) {
@@ -670,53 +679,59 @@ int destroy_menu(window_t *w) {
     }
     w->menu = NULL;
 
-    if (w->items == NULL) {
+    if (items == NULL) {
         TRACE("destroy_menu: No items to free");
         return OK;
     }
 
-    destroy_itens(w);
+    destroy_items(items);
 
     return OK;
 }
 
-int destroy_itens(window_t *w) {
-    if (w == NULL || w->items == NULL) {
-        TRACE("destroy_itens: Invalid parameters");
+int destroy_items(ITEM ** items) {
+    if (items == NULL) {
+        TRACE("destroy_items: Invalid parameters");
         return ERR;
     }
 
-    TRACE("destroy_itens: Freeing menu items");
-    for (int i = 0; w->items[i] != NULL; i++) {
-        TRACE("destroy_itens: Freeing item %d", i);
-        if (free_item(w->items[i]) != E_OK) {
-            TRACE("destroy_itens: Error freeing item %d", i);
+    TRACE("destroy_items: Freeing menu items");
+    for (int i = 0; items[i] != NULL; i++) {
+        TRACE("destroy_items: Freeing item %d", i);
+        if (free_item(items[i]) != E_OK) {
+            TRACE("destroy_items: Error freeing item %d", i);
             return ERR;
         }
-        w->items[i] = NULL;
+        items[i] = NULL;
     }
-    free(w->items);
-    w->items = NULL;
-    TRACE("destroy_itens: Ended");
+    free(items);
+    items = NULL;
+    TRACE("destroy_items: Ended");
     return OK;
 }
 
-int create_menu(window_t *w, Menu_Options_Seeting options) {
+int create_menu(window_t *w, ITEM ** items, Menu_Options_t options) {
     TRACE("create_menu: Started");
-    if (w == NULL || w->items == NULL) {
+    if (w == NULL || items == NULL) {
         TRACE("create_menu: Invalid parameters");
         return ERR;
     }
 
     TRACE("create_menu: Creating new menu");
-    w->menu = new_menu(w->items);
+    w->menu = new_menu(items);
     if (w->menu == NULL) {
         TRACE("create_menu: Error creating new menu");
         return ERR;
     }
+    WINDOW *window = panel_window(w->panel);
+
+    if(window == NULL){
+        TRACE("create_menu: Window is null");
+        return ERR;
+    }
 
     TRACE("create_menu: Setting menu window");
-    if (set_menu_win(w->menu, w->window) != E_OK) {
+    if (set_menu_win(w->menu, window) != E_OK) {
         TRACE("create_menu: Error setting menu window");
         free_menu(w->menu);
         w->menu = NULL;
@@ -724,7 +739,7 @@ int create_menu(window_t *w, Menu_Options_Seeting options) {
     }
 
     TRACE("create_menu: Setting menu subwindow");
-    if (set_menu_sub(w->menu, derwin(w->window, getmaxy(w->window) - 2, getmaxx(w->window) - 2, 1, 1)) != E_OK) {
+    if (set_menu_sub(w->menu, derwin(window, getmaxy(window) - 2, getmaxx(window) - 2, 1, 1)) != E_OK) {
         TRACE("create_menu: Error setting menu subwindow");
         free_menu(w->menu);
         w->menu = NULL;
@@ -732,7 +747,7 @@ int create_menu(window_t *w, Menu_Options_Seeting options) {
     }
 
     TRACE("create_menu: Setting menu format");
-    if (set_menu_format(w->menu, getmaxy(w->window) - 3, 1) != E_OK) {
+    if (set_menu_format(w->menu, getmaxy(window) - 3, 1) != E_OK) {
         TRACE("create_menu: Error setting menu format");
         free_menu(w->menu);
         w->menu = NULL;
@@ -795,14 +810,25 @@ int free_window(window_t *w) {
         }
     }
 
+    WINDOW *window = panel_window(w->panel);
+    if(window == NULL){
+        TRACE("free_window: window is null");
+        return ERR;
+    }
+
     TRACE("free_window: Freeing window");
-    if (w->window != NULL) {
-        if(delwin(w->window) != OK){
+    if (window != NULL) {
+        if(delwin(window) != OK){
             TRACE("free_window: Error deleting window");
             return ERR;
         }
     }
-
+    if(w->panel != NULL){
+        if(del_panel(w->panel) != OK){
+            TRACE("free_window: Error deleting panel");
+            return ERR;
+        }
+    }
     TRACE("free_window: Freeing memory");
     free(w);
 
@@ -857,21 +883,37 @@ void right_command(va_list args){
 }
 
 void select_command(va_list args){
-    
+    static int index_item = 0;
     TRACE("main: select");
     window_t *painel_w  = va_arg(args, window_t *);
     ITEM *it = current_item(painel_w->menu);
-    const char *sel = item_description(it);
+    // const char *name = item_name(it);
+    const char *sel =  item_description(it);
     if(sel && strcmp(sel, "MORE") == 0){
         TRACE("main: more");
         if (!search_api("MORE", painel_w)) {
             TRACE("main: Error searching more");
         }
+        int item_c = item_count(painel_w->menu);
+
+        for(int j = 0; j < item_c; j++){
+            for (int i = 0; i < index_item; i++){
+                
+            }
+            drive_menu(painel_w, REQ_DOWN_ITEM);
+        }
     }else{
+        index_item++;
+        void *tmp = realloc(selected_items, index_item * sizeof(ITEM *));
+        if(!tmp){
+            TRACE("main: select: error in alocation selected_items");
+            return;
+        }
+        selected_items = tmp;
+        selected_items[index_item] = it;
         int index = item_index(it);
         TRACE("main: selecting item %d", index);
-        int i = menu_driver(painel_w->menu, REQ_TOGGLE_ITEM);
-        TRACE("res %d", i);
+        drive_menu(painel_w, REQ_TOGGLE_ITEM);
     }
 
 }

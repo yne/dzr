@@ -13,10 +13,8 @@
 
 
 typedef struct window_t {
-  WINDOW *window;
   PANEL *panel;
   MENU *menu;
-  ITEM **items;
   int y;
   int x;
   int starty;
@@ -27,14 +25,14 @@ typedef struct window_t {
 typedef struct {
     Menu_Options on;
     Menu_Options off;
-} Menu_Options_Seeting;
+} Menu_Options_t;
 
-const Menu_Options_Seeting GLOBAL_MENU_OPTIONS = {
+const Menu_Options_t GLOBAL_MENU_OPTIONS = {
   .on = O_NONCYCLIC,
   .off = O_SHOWDESC | O_ONEVALUE
 };
 
-const Menu_Options_Seeting GLOBAL_PLAYLIST_OPTIONS = {
+const Menu_Options_t GLOBAL_PLAYLIST_OPTIONS = {
   .on = O_ONEVALUE | O_NONCYCLIC,
   .off = O_SHOWDESC
 };
