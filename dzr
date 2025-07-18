@@ -57,7 +57,7 @@ done
 API="api.deezer.com"
 DLG_LIST="dialog --keep-tite --output-fd 1 --menu $1: 0 0 0"
 DLG_TEXT="dialog --keep-tite --output-fd 1 --inputbox $1: 0 0"
-FMT_LIST='(if .data then .data else .tracks.data end)[]|("/"+.type+"/"+(.id|tostring), (.title+.name+" "+.artist.name|gsub("\\x22";"")))'
+FMT_LIST='((if .data then .data else .tracks.data end)[]|("/"+.type+"/"+(.id|tostring), (.title+.name+" "+.artist.name|gsub("\\x22";"")))),([.prev,.next]|map(select(.))|map(.[21:],(.|split("?")[1])))[]'
 FMT_TRKS='"/track/"+([(if .data then .data else .tracks.data end)[]|select(.type=="track")|.id]|@csv)'
 FMT_FUNC='s@[,?].*@@;s@[^a-zA-Z0-9]\{1,\}@_@g;s@[0-9,]\{1,\}@0@g;s@_\{1,\}$@@'
 

@@ -196,6 +196,11 @@
 					"default": "",
 					"description": "Access Rights Locator"
 				},
+				"dzr.nextCount": {
+					"type": "number",
+					"default": 5,
+					"markdownDescription": "Number of `.next` page to fetch before showing quickpick (`-1 for unlimited`)"
+				},
 				"dzr.secure": {
 					"type": "boolean",
 					"default": false,

@@ -42,11 +42,13 @@ async function browse(url_or_event_or_ids, label) {
 			if (!pick) return;
 			return await browse(url + pick.path, pick.label);
 		} else { // fetch step
-			const json = JSON.parse(await fetch("https://api.deezer.com" + url)); // todo: json.next?
-			//console.debug(json);
-			const data = json.data?.tracks || json.data || json.tracks?.data;
-			const picked = url.match(/\/(playlist|album)\//);
-			const canPickMany = data.find(item => item.type == "track");
+			/**@type {{type:string,title_short:string,artist:{name:string},title_version:string,title:string,name:string,nb_tracks:string,id:number}[]} */
+			const data = [];
+			for (let n = conf().get('nextCount'), json, nextUrl = "https://api.deezer.com" + url; --n && (json = JSON.parse(await fetch(nextUrl))); nextUrl = json.next) {
+				data.push(...(json.data?.tracks || json.data || json.tracks?.data));
+			}
+			const picked = !!url.match(/\/(playlist|album)\//);
+			const canPickMany = !!data.find(item => item.type == "track");
 			const type2icon = conf().get('type2icon');
 			const choices = data.map(entry => ({
 				...entry, picked,
@@ -87,7 +89,7 @@ const with_url = async (songs) => songs?.length ? await vscode.window.withProgre
 		const errors = SNG_NFO.filter(e => e.errors).map(e => `[${e.SNG_ID}] ${e.ART_NAME} - ${e.SNG_TITLE}:${JSON.stringify(e.errors)}`);
 		const skiped = SNG_NFO.filter(s => !s.media?.[0]?.sources?.[0]?.url).map(e => `[${e.SNG_ID}] no MEDIA`);
 		if (errors.length || skiped.length) {
-			vscode.window.showWarningMessage([...errors, ...skiped].join('\n'), "Flush ARL", "Continue")
+			vscode.window.showWarningMessage([...errors, ...skiped].join('\n'), "Continue", "Flush ARL")
 				.then(e => { if (e == "Flush ARL") conf().update('arl', undefined, vscode.ConfigurationTarget.Global) });
 		}
 		return SNG_NFO.map(nfo => ({
@@ -169,7 +171,7 @@ class DzrWebView { // can't Audio() in VSCode, we need a webview
 	post = (action, ...arg) => this.panel?.webview.postMessage([action, ...arg]);
 	// event from webview player
 	player_bufferized() {
-		this.waitAckSemaphore();
+		this.waitAckSemaphore?.(0);
 		this.initAckSemaphore();
 	}
 	player_volumechange({ volume }) { conf().update("volume", volume, vscode.ConfigurationTarget.Global); }
