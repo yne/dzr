@@ -30,7 +30,7 @@
 | Gentoo + [GURU](https://github.com/gentoo/guru)            | `emerge --ask dzr` | ![](https://repology.org/badge/version-for-repo/gentoo_ovl_guru/dzr.svg?header=)
 | Ubuntu + [Snap](https://snapcraft.io/dzr) | `snap install --edge dzr` | [Help Me](https://github.com/yne/dzr/issues/25)
 | Linux + [Flatpak](https://www.flatpak.org/) | `flatpak install dzr` | [Help Me](https://github.com/yne/dzr/issues/25)
-| Nix + [Flake](https://nixos.wiki/wiki/flakes) | `nix run github.com/yne/dzr` | [Help Me](https://github.com/yne/dzr/issues/25)
+| Nix + [Flake](https://wiki.nixos.org/wiki/flakes) | `nix run github.com/yne/dzr` | [Help Me](https://github.com/yne/dzr/issues/25)
 | Android + [Termux](https://f-droid.org/packages/com.termux/) | `curl -sL github.com/yne/dzr/archive/master.tar.gz \| tar xzf -` <br> `mv dzr-master/dzr* $PREFIX/bin` | [![](https://img.shields.io/badge/-tar.gz-40c010?logo=hackthebox)](https://github.com/yne/dzr/archive/master.tar.gz)
 | VSCode | `code --install-extension ./path/to/dzr-*.vsix` | [![](https://img.shields.io/badge/VSIX-4c1?logo=visualstudiocode)](https://github.com/yne/dzr/releases)
 
