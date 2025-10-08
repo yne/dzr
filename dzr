@@ -28,7 +28,25 @@ if [ -z "$DZR_CBC" ]; then
 	sleep 2 # give time to read the warning
 	echo
 fi
-
+if [ -z "$DZR_ARL" ]; then
+	echo "Starting on 2025-03-08, Anonymous playback are blocked."
+	echo "To authenticate DZR to your account:"
+	echo "- Sign in/up to https://www.deezer.com/"
+	echo "- Then open https://www.deezer.com/desktop/login/electron/callback"
+	echo "- Right click on the 'Open' button, then 'copy link address'."
+	while true; do
+		echo "past the deezer:// link here:"
+		read DZR_ARL
+		export DZR_ARL=$(printf $DZR_ARL | cut -d'/' -f4)
+		echo "$DZR_ARL" | grep -q '^[0-9a-f]\+$' && break;
+		echo "Invalid ARL format (expect: ^[0-9a-f]+$):"
+		echo $DZR_ARL
+	done
+	printf "To skip this message, add the following line to your shell profile (e.g. ~/.profile or ~/.zshrc):\n" >&2
+	echo "    export DZR_ARL=$DZR_ARL"
+	sleep 2 # give time to read the warning
+	echo
+fi
 # dependencies check, see: https://github.com/yne/dzr/issues/12
 for c in jq curl dialog openssl $(echo "$PLAYER" | cut -f 1 -d " "); do
 	command -v $c >/dev/null || { echo "$c is required" 1>&2 ; UNMET_DEPENDENCIES=1;}
@@ -39,17 +57,17 @@ done
 API="api.deezer.com"
 DLG_LIST="dialog --keep-tite --output-fd 1 --menu $1: 0 0 0"
 DLG_TEXT="dialog --keep-tite --output-fd 1 --inputbox $1: 0 0"
-FMT_LIST='(if .data then .data else .tracks.data end)[]|("/"+.type+"/"+(.id|tostring), (.title+.name+" "+.artist.name|gsub("\\x22";"")))'
+FMT_LIST='((if .data then .data else .tracks.data end)[]|("/"+.type+"/"+(.id|tostring), (.title+.name+" "+.artist.name|gsub("\\x22";"")))),([.prev,.next]|map(select(.))|map(.[21:],(.|split("?")[1])))[]'
 FMT_TRKS='"/track/"+([(if .data then .data else .tracks.data end)[]|select(.type=="track")|.id]|@csv)'
 FMT_FUNC='s@[,?].*@@;s@[^a-zA-Z0-9]\{1,\}@_@g;s@[0-9,]\{1,\}@0@g;s@_\{1,\}$@@'
 
 dzr()          { $DLG_LIST /search/track?q= 'by name' /search/artist?q= 'by name' /search/album?q= 'by name' /search/playlist?q= 'by name' /search/user?q= 'by name' /search/radio?q= 'by name' /genre 'list' /radio 'list' /user/0 'by id' ;} 
 dzr_genre_0()  { $DLG_LIST radios '' artists '' ;}
 dzr_radio_0()  { $DLG_LIST tracks '' fans '' ;}
-dzr_album_0()  { $DLG_LIST tracks '' fans '' ;}
+dzr_album_0()  { $DLG_LIST tracks?limit=999 '' fans '' ;}
 dzr_user_0()   { $DLG_LIST charts '' albums '' playlists '' flow '' tracks '' artists '' ;}
-dzr_artist_0() { $DLG_LIST top?limit=50 '' albums '' fans '' related '' radio '' playlists '' ;}
-dzr_default()  { $FETCH -H "Accept-Language: $LANG" "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST ▸ "play all /track/" ⇄ "shuf all /track/" ;} # TODO: .next
+dzr_artist_0() { $DLG_LIST top?limit=100 '' albums '' fans '' related '' radio '' playlists '' ;}
+dzr_default()  { $FETCH -H "Accept-Language: $LANG" "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST ▸ "play all /track/" ⇄ "shuf all /track/" ;}
 play() { # receive /track/1,2,3 from stdin
 	xargs basename | xargs $0-url | ${1:-cat} | while read url id; do
 		$FETCH "$url" | $0-dec $id | eval ${PLAYER:-'mpv -'} || break # stop if Ctrl+C : $? = 4

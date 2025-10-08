@@ -12,6 +12,26 @@
 #include <wchar.h>
 #include <locale.h>
 
+#define REQUIRE(msg, cond) do {                                                                                                      \
+    if((cond)) {                                                                                                                     \
+        TRACE(msg);                                                                                                                  \
+        fprintf(stderr, "REQUIRE FAILED: %s at %s:%d in %s()\n", #cond, __FILE__, __LINE__, __func__);                               \
+        fflush(stderr);                                                                                                              \
+        return ERR;                                                                                                                  \
+    }                                                                                                                                \
+} while(0)                                                                                                                           \
+
+#define REQUIRE_CODE(msg, cond, code)                                                                                                \
+do {                                                                                                                                 \
+    if((cond)) {                                                                                                                     \
+        TRACE(msg);                                                                                                                  \
+        fprintf(stderr, "REQUIRE FAILED: %s at %s:%d in %s()\n", #cond, __FILE__, __LINE__, __func__);                               \
+        fflush(stderr);                                                                                                              \
+        code                                                                                                                         \
+        return ERR;                                                                                                                  \
+    }                                                                                                                                \
+} while(0)                                                                                                                           \
+
 ITEM ** selected_items = NULL; 
 
 int update_menu(window_t *w, ITEM ** items);
@@ -27,8 +47,6 @@ int drive_menu(window_t *w, int key);
 int addLabel(WINDOW *win, char *str);
 
 char *search_input(const char* label);
-
-char *int_to_string(char* format, int i);
 
 char *filter_chars(char *str);
 
@@ -103,16 +121,14 @@ int main(int argc, char **argv) {
     painel_w->menu = NULL;
 
     TRACE("main: creating playlist window");
-    if(create_win(playlist_w) != OK){
-        TRACE("Error creating playlist window");
+    REQUIRE_CODE("Error creating playlist window", create_win(playlist_w) != OK, {    
         goto exit;
-    }
+    });
 
     TRACE("main: creating painel window");
-    if(create_win(painel_w) != OK){
-        TRACE("Error creating painel window");
+    REQUIRE_CODE("Error creating painel window", create_win(painel_w) != OK, {
         goto exit;
-    }
+    });
     
     TRACE("main: searching for input");
     search_input("INIT");
@@ -278,7 +294,7 @@ int search_api(char *path, window_t *w) {
     }
 
 #define CHECK(json_field)                                                                                                                            \
-    if (!json_field) {                                                                                                                               \
+    if (!(json_field)) {                                                                                                                             \
         cJSON_Delete(json);                                                                                                                          \
         free(response_data->data);                                                                                                                   \
         free(response_data);                                                                                                                         \
@@ -337,7 +353,7 @@ int search_api(char *path, window_t *w) {
             cJSON *c_nb_tracks = cJSON_GetObjectItem(c_item, "nb_tracks");
             CHECK(c_nb_tracks);
             int nb_tracks = (int)cJSON_GetNumberValue(c_nb_tracks);
-            char *nb_tracks_str = int_to_string("(%d)", nb_tracks);
+            char *nb_tracks_str = format_string("(%d)", nb_tracks);
             CHECK(nb_tracks_str);
             names.nb_tracks = malloc(strlen(nb_tracks_str) + 1);
             strcpy(names.nb_tracks, nb_tracks_str);
@@ -377,13 +393,12 @@ int search_api(char *path, window_t *w) {
     
     int i = 0;
     for(; response_internal->items[i] != NULL; i++){
-        char * id_str = int_to_string(NULL, response_internal->items[i]->id);
-        items[i] = new_item(response_internal->items[i]->name, id_str);
+        char * id_str = format_string("%d", response_internal->items[i]->id);
+        items[i] = new_item(format_string("%i. %s", i + 1, response_internal->items[i]->name), id_str);
     }
     if (!(response_internal->cur_size > 0 && response_internal->total > 0 && response_internal->cur_size > response_internal->total - 1)) {
         if(response_internal->next){
-
-            items[i] = new_item("-- MORE --", "MORE");
+            items[i] = new_item(format_string("-- MORE (%i from %i) --", response_internal->cur_size, response_internal->total), "MORE");
             i++;
         }
     }
@@ -397,49 +412,28 @@ int search_api(char *path, window_t *w) {
     return 1;
 }
 
-char *int_to_string(char *format, int i) {
-    int len = snprintf(NULL, 0, format ? format : "%d", i);
-    char *str = calloc(len + 1, sizeof(char));
-    snprintf(str, len + 1, format ? format : "%d", i);
-    return (char *)str;
-}
-
 int clear_and_write(window_t *w, char *str) {
-    if (w == NULL) {
-        TRACE("Invalid parameters in clear_and_write");
-        return ERR;
-    }
+
+    REQUIRE("Invalid parameters in clear_and_write", w == NULL);
 
     WINDOW *window = panel_window(w->panel);
-    if( window == NULL){
-        TRACE("window is null");
-        return ERR;
-    }
+    REQUIRE("Window is NULL", window == NULL);
+
 
     TRACE("Clearing window in clear_and_write");
-    if (wclear(window) != OK) {
-        TRACE("Error clearing window in clear_and_write");
-        return ERR;
-    }
+    REQUIRE("Error clearing window in clear_and_write", wclear(window) != OK);
+    
 
     TRACE("Drawing box in clear_and_write");
-    if (box(window, 0, 0) != OK) {
-        TRACE("Error drawing box in clear_and_write");
-        return ERR;
-    }
+    REQUIRE("Error drawing box in clear_and_write", box(window, 0, 0) != OK);
+    
 
     TRACE("Adding label in clear_and_write");
-    if(addLabel(window, w->label) != OK){
-        TRACE("Error adding label in clear_and_write");
-        return ERR;
-    }
+    REQUIRE("Error adding label in clear_and_write", addLabel(window, w->label) != OK);
 
     if(str && strlen(str) > 0){
         TRACE("Adding string in clear_and_write");
-        if (mvwaddstr(window, 1, 3, str) != OK) {
-            TRACE("Error adding string in clear_and_write");
-            return ERR;
-        }
+        REQUIRE("Error adding string in clear_and_write", mvwaddstr(window, 1, 3, str) != OK);
     }
     return OK;
 }
@@ -479,7 +473,7 @@ char *search_input(const char *label) {
         search_window->starty = (getmaxy(stdscr) / 2) - (search_window->y / 2);
         search_window->startx = (getmaxx(stdscr) / 2) - (search_window->x / 2);
 
-        if (create_win(search_window) != OK) {
+        if(create_win(search_window) != OK){
             TRACE("search_input: Error creating window");
             free(search_window);
             return NULL;
@@ -573,56 +567,40 @@ char *filter_chars(char *input_string) {
 }
 
 int update_menu(window_t *w, ITEM ** items){
-    if(w == NULL){
-        TRACE("update_menu: unable update menu");
-        return ERR;
-    }
+
+    REQUIRE("update_menu: unable update menu", w == NULL);
+    
     if(w->menu){
         TRACE("update_menu: destroying menu");
-        if(destroy_menu(w) != OK){
-            TRACE("update_menu: error create menu");
-            return ERR;
-        };
+        REQUIRE("update_menu: error create menu", destroy_menu(w) != OK);
     }
 
     TRACE("update_menu: creating menu");
-    if(create_menu(w, items, GLOBAL_MENU_OPTIONS) != OK){
-        TRACE("update_menu: error create menu");
-        return ERR;
-    };
-    if(w->menu == NULL){
-        TRACE("update_menu: menu doesn't exist");
-        return ERR;
-    }
+    
+    REQUIRE("update_menu: error create menu", create_menu(w, items, GLOBAL_MENU_OPTIONS) != OK);
+    
+    REQUIRE("update_menu: menu doesn't exist", w->menu == NULL);
+    
     return OK;
 }
 
 int create_win(window_t *w) {
     TRACE("create_win: Creating window");
+    
     WINDOW *window = newwin(w->y, w->x, w->starty, w->startx);
-    if (!window) {
-        TRACE("create_win: Unable to create window");
-        return ERR;
-    }
+    REQUIRE("create_win: Unable to create window", !window);
+    
 
     TRACE("create_win: Drawing box in window");
-    if (box(window, 0, 0) != OK) {
-        TRACE("create_win: Error drawing box");
-        return ERR;
-    }
+    REQUIRE("create_win: Error drawing box", box(window, 0, 0) != OK);
 
     TRACE("create_win: Adding label to window");
-    if (addLabel(window, w->label) != OK) {
-        TRACE("create_win: Error adding label");
-        return ERR;
-    }
+
+    REQUIRE("create_win: Error adding label", addLabel(window, w->label) != OK);
 
     TRACE("create_win: Creating panel for window");
     w->panel = new_panel(window);
-    if (!w->panel) {
-        TRACE("create_win: Error creating panel");
-        return ERR;
-    }
+    REQUIRE("create_win: Error creating panel", !w->panel);
 
     TRACE("create_win: Window created successfully");
     return OK;
@@ -630,27 +608,22 @@ int create_win(window_t *w) {
 
 int addLabel(WINDOW *win, char *str) {
     TRACE("addLabel: Started");
-    if (win == NULL || str == NULL) {
-        TRACE("addLabel: Invalid parameters");
-        return ERR;
-    }
+    REQUIRE("addLabel: Invalid parameters", win == NULL || str == NULL);
 
     TRACE("addLabel: Allocating memory for nstr");
+
     size_t len = strlen(str);
     char *nstr = malloc(len + 3);
-    if (nstr == NULL) {
-        TRACE("addLabel: Error allocating memory for nstr");
-        return ERR;
-    }
+
+    REQUIRE("addLabel: Error allocating memory for nstr", nstr == NULL);
 
     TRACE("addLabel: Formatting string");
     sprintf(nstr, " %.*s ", (int)len, str);
     int x = getmaxx(win) * 0.10;
-    if (mvwaddstr(win, 0, x, nstr) != OK) {
-        TRACE("addLabel: Error adding string");
+    
+    REQUIRE_CODE("addLabel: Error adding string", mvwaddstr(win, 0, x, nstr) != OK, {
         free(nstr);
-        return ERR;
-    }
+    });
 
     TRACE("addLabel: Freeing memory for nstr");
     free(nstr);
@@ -659,30 +632,22 @@ int addLabel(WINDOW *win, char *str) {
 }
 
 int destroy_menu(window_t *w) {
-    if (w == NULL || w->menu == NULL) {
-        TRACE("destroy_menu: Invalid parameters");
-        return ERR;
-    }
+    REQUIRE("destroy_menu: Invalid parameters", w == NULL || w->menu == NULL);
 
     TRACE("destroy_menu: Unposting menu");
-    if (unpost_menu(w->menu) != E_OK) {
-        TRACE("destroy_menu: Error unposting menu");
-        return ERR;
-    }
+    REQUIRE("destroy_menu: Error unposting menu", unpost_menu(w->menu) != E_OK);
     
     ITEM ** items = menu_items(w->menu);
-
+    
+    REQUIRE("items null", items == NULL);
+    
     TRACE("destroy_menu: Freeing menu");
-    if (free_menu(w->menu) != E_OK) {
-        TRACE("destroy_menu: Error freeing menu");
-        return ERR;
-    }
+    
+    REQUIRE("destroy_menu: Error freeing menu", free_menu(w->menu) != E_OK);
+    
     w->menu = NULL;
 
-    if (items == NULL) {
-        TRACE("destroy_menu: No items to free");
-        return OK;
-    }
+    REQUIRE("destroy_menu: No items to free", items == NULL);
 
     destroy_items(items);
 
@@ -690,10 +655,7 @@ int destroy_menu(window_t *w) {
 }
 
 int destroy_items(ITEM ** items) {
-    if (items == NULL) {
-        TRACE("destroy_items: Invalid parameters");
-        return ERR;
-    }
+    REQUIRE("destroy_items: Invalid parameters", items == NULL);
 
     TRACE("destroy_items: Freeing menu items");
     for (int i = 0; items[i] != NULL; i++) {
@@ -712,23 +674,16 @@ int destroy_items(ITEM ** items) {
 
 int create_menu(window_t *w, ITEM ** items, Menu_Options_t options) {
     TRACE("create_menu: Started");
-    if (w == NULL || items == NULL) {
-        TRACE("create_menu: Invalid parameters");
-        return ERR;
-    }
+    REQUIRE("create_menu: Invalid parameters", w == NULL || items == NULL);
+    
 
     TRACE("create_menu: Creating new menu");
     w->menu = new_menu(items);
-    if (w->menu == NULL) {
-        TRACE("create_menu: Error creating new menu");
-        return ERR;
-    }
+    REQUIRE("create_menu: Error creating new menu", w->menu == NULL);
+   
     WINDOW *window = panel_window(w->panel);
 
-    if(window == NULL){
-        TRACE("create_menu: Window is null");
-        return ERR;
-    }
+    REQUIRE("create_menu: Window is null", window == NULL);
 
     TRACE("create_menu: Setting menu window");
     if (set_menu_win(w->menu, window) != E_OK) {
@@ -797,37 +752,21 @@ int drive_menu(window_t *w, int key) {
 }
 
 int free_window(window_t *w) {
-    if (w == NULL) {
-        TRACE("free_window: Window is NULL");
-        return OK;
-    }
+    REQUIRE("free_window: Window is NULL", w == NULL);
 
     TRACE("free_window: Freeing menu");
     if (w->menu != NULL) {
-        if(destroy_menu(w) != OK){
-            TRACE("free_window: Error destroying menu");
-            return ERR;
-        }
+        REQUIRE("free_window: Error destroying menu", destroy_menu(w) != OK);
     }
 
     WINDOW *window = panel_window(w->panel);
-    if(window == NULL){
-        TRACE("free_window: window is null");
-        return ERR;
-    }
+    REQUIRE("free_window: window is null", window == NULL);
 
     TRACE("free_window: Freeing window");
-    if (window != NULL) {
-        if(delwin(window) != OK){
-            TRACE("free_window: Error deleting window");
-            return ERR;
-        }
-    }
+    REQUIRE("free_window: Error deleting window", delwin(window) != OK);
+    
     if(w->panel != NULL){
-        if(del_panel(w->panel) != OK){
-            TRACE("free_window: Error deleting panel");
-            return ERR;
-        }
+        REQUIRE("free_window: Error deleting panel", del_panel(w->panel) != OK);
     }
     TRACE("free_window: Freeing memory");
     free(w);
@@ -978,7 +917,7 @@ int do_command(int ch, ...){
         if(commands[i].key == ch ){
             TRACE("do_command exec");
             va_list args;
-            va_start(args);
+            va_start(args, 0);
             commands[i].func(args);
             va_end(args);
         }

@@ -38,15 +38,15 @@ static inline char * format_string(char* fmt, ...){
   return buf;
 }
 
-#define DEBUG_CURSES(fmt, ...)                        \
-do {                                                  \
-  if (stdscr) {                                       \
-      char * buf = format_string(fmt, ##__VA_ARGS__);  \
-      mvaddstr(getmaxy(stdscr) - 2, 2, buf);          \
-      wrefresh(stdscr);                               \
-      free(buf);                                      \
-  }                                                   \
-} while(0)                                            \
+#define DEBUG_CURSES(fmt, ...)                          \
+do {                                                    \
+  if (stdscr) {                                         \
+      char * buf = format_string(fmt, ##__VA_ARGS__);   \
+      mvaddstr(getmaxy(stdscr) - 2, 2, buf);            \
+      wrefresh(stdscr);                                 \
+      free(buf);                                        \
+  }                                                     \
+} while(0)                                              \
 
 #define TRACE_MODE 1
 
@@ -55,11 +55,10 @@ do {                                                  \
     do {                                                                         \
       fprintf(stderr, "TRACE: " fmt "\n", ##__VA_ARGS__);                        \
       fflush(stderr);                                                            \
-      DEBUG_CURSES(fmt, ##__VA_ARGS__);                                            \
+      DEBUG_CURSES(fmt, ##__VA_ARGS__);                                          \
     } while (0)
 #else
   #define TRACE(fmt, ...)
 #endif
-
 
 #endif /* LOGGING_H */

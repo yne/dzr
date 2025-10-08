@@ -22,21 +22,22 @@ const [dialog] = document.getElementsByTagName('dialog');
 const title = document.getElementById('title');
 const artists = document.getElementById('artists');
 const cmd = (name, ...args) => `command:${name}?` + encodeURIComponent(JSON.stringify(args));
-dialog.onclose=()=>{audio.play();post('user_interact');}
-['ended', 'pause', 'playing'].map(on => audio.addEventListener(on, () => post('player_' + on)));
+dialog.onclose=()=>{audio.play();post(['user_interact']);}
+['ended', 'pause', 'playing', 'volumechange'].map(on => audio.addEventListener(on, () => post(['player_' + on, {volume:audio.volume}])));
 let mediaSource, sourceBuffer;
 const image = (type,md5,size=80) => `https://e-cdns-images.dzcdn.net/images/${type}/${md5}/${size}x${size}.jpg`
 const on = {// event from VSCode
-    async open(item) {
+    async open(item,volume) {
         mediaSource = new window.MediaSource();
+        audio.volume = volume;
         audio.src = window.URL.createObjectURL(mediaSource);
         await new Promise(then => mediaSource.onsourceopen = () => then());
         sourceBuffer = mediaSource.addSourceBuffer("audio/mpeg");
-        sourceBuffer.addEventListener("updateend", (ev) => post('player_bufferized'));
+        sourceBuffer.addEventListener("updateend", (ev) => post(['player_bufferized']));
     },
     append(buf) { sourceBuffer.appendBuffer(buf) },
     close() { mediaSource.endOfStream() },
-    play() { audio.play().catch(e=>post('error', e)) },
+    play() { audio.play().catch(e=>post(['error', `${e}`])) },
     pause() { audio.pause() },
     state(state, updates=[]) {
         if (updates.includes('current')) {
@@ -50,7 +51,7 @@ const on = {// event from VSCode
                 artwork: [{ src: img.src, sizes: "1000x1000", type: "image/jpg" }]
             });
         }
-    }
+    },
 };
 window.addEventListener('message', ({ data: [cmd,...args] }) => {
     if (!on[cmd]) return console.log("bad message:" + JSON.stringify([cmd,...args]));
@@ -58,7 +59,7 @@ window.addEventListener('message', ({ data: [cmd,...args] }) => {
 });
 navigator.mediaSession.setActionHandler("play", on.play);
 navigator.mediaSession.setActionHandler("pause", on.pause);
-navigator.mediaSession.setActionHandler("nexttrack", ()=>post('user_next'))
+navigator.mediaSession.setActionHandler("nexttrack", ()=>post(['user_next']))
 //navigator.mediaSession.setActionHandler("previoustrack", ()=>{})
 </script>
 <style>

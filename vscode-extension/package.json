@@ -2,7 +2,7 @@
 	"name": "dzr",
 	"displayName": "DZR player",
 	"description": "deezer.com player",
-	"version": "0.1.0",
+	"version": "0.3.0",
 	"publisher": "yne",
 	"engines": {
 		"vscode": "^1.73.0"
@@ -191,6 +191,28 @@
 					"default": "",
 					"description": "track decryption key"
 				},
+				"dzr.arl": {
+					"type": "string",
+					"default": "",
+					"description": "Access Rights Locator"
+				},
+				"dzr.nextCount": {
+					"type": "number",
+					"default": 5,
+					"markdownDescription": "Number of `.next` page to fetch before showing quickpick (`-1 for unlimited`)"
+				},
+				"dzr.secure": {
+					"type": "boolean",
+					"default": false,
+					"description": "Disable if you are behind a corporate proxy"
+				},
+				"dzr.volume": {
+					"type": "number",
+					"default": 1,
+					"minimum": 0,
+					"maximum": 1,
+					"description": "Player volume [0..1], Applied at next track play"
+				},
 				"dzr.queue": {
 					"type": "array",
 					"default": [],
@@ -208,7 +230,7 @@
 				},
 				"dzr.menus": {
 					"type": "object",
-					"description": "API tree (this they endpoint are not RESTful)",
+					"description": "API tree (since deezer endpoint are not RESTful)",
 					"default": {
 						"_": [
 							{
@@ -323,6 +345,7 @@
 				"dzr.type2icon": {
 					"type": "object",
 					"description": "VSCode picker icon to display according to item type",
+					"additionalProperties": true,
 					"default": {
 						"track": "$(play-circle) ",
 						"artist": "$(person) ",
@@ -331,6 +354,11 @@
 						"radio": "$(broadcast) ",
 						"genre": "$(telescope) ",
 						"user": "$(account) "
+					},
+					"patternProperties": {
+						".*": {
+							"type": "string"
+						}
 					}
 				}
 			}
