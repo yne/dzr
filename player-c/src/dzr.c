@@ -160,9 +160,20 @@ int main(int argc, char **argv) {
     if(playlist_w != NULL){
         free_window(playlist_w);
     }
+    
+    if(selected_items){
+        int item_c = item_count(painel_w->menu);
+        for(int i = 0; i < item_c; i++){
+            if(selected_items[i]){
+                free(selected_items[i]);
+            }
+        }
+    }
     if(painel_w != NULL){
         free_window(painel_w);
     }
+
+
     endwin();
     exit(0);
     return 0;
@@ -581,6 +592,15 @@ int update_menu(window_t *w, ITEM ** items){
     
     REQUIRE("update_menu: menu doesn't exist", w->menu == NULL);
     
+    int item_c = item_count(w->menu);
+
+    void *tmp = realloc(selected_items, item_c * sizeof(ITEM *));
+    if(!tmp){
+        TRACE("main: select: error in alocation selected_items");
+        return ERR;
+    }
+    selected_items = tmp;
+
     return OK;
 }
 
@@ -822,35 +842,25 @@ void right_command(va_list args){
 }
 
 void select_command(va_list args){
-    static int index_item = 0;
     TRACE("main: select");
     window_t *painel_w  = va_arg(args, window_t *);
     ITEM *it = current_item(painel_w->menu);
-    // const char *name = item_name(it);
+    int item_c = item_count(painel_w->menu);
+    //const char *name = item_name(it);
     const char *sel =  item_description(it);
     if(sel && strcmp(sel, "MORE") == 0){
         TRACE("main: more");
         if (!search_api("MORE", painel_w)) {
             TRACE("main: Error searching more");
         }
-        int item_c = item_count(painel_w->menu);
+       
 
         for(int j = 0; j < item_c; j++){
-            for (int i = 0; i < index_item; i++){
-                
-            }
-            drive_menu(painel_w, REQ_DOWN_ITEM);
+           
         }
     }else{
-        index_item++;
-        void *tmp = realloc(selected_items, index_item * sizeof(ITEM *));
-        if(!tmp){
-            TRACE("main: select: error in alocation selected_items");
-            return;
-        }
-        selected_items = tmp;
-        selected_items[index_item] = it;
         int index = item_index(it);
+        selected_items[index] = it;
         TRACE("main: selecting item %d", index);
         drive_menu(painel_w, REQ_TOGGLE_ITEM);
     }
@@ -901,15 +911,13 @@ static command_t commands[] = {
     {
         COMMAND, search
     },
-    {
-        0, NULL
-    }
+    { 0 , NULL }
 };
 
 
 int do_command(int ch, ...){
     TRACE("do_command init");
-    for(int i=0;; i++){
+    for(int i=0;;i++){
         if(commands[i].key == 0){
             TRACE("do_command end");
             break;
