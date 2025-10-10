@@ -845,17 +845,23 @@ void select_command(va_list args){
     TRACE("main: select");
     window_t *painel_w  = va_arg(args, window_t *);
     ITEM *it = current_item(painel_w->menu);
-    int item_c = item_count(painel_w->menu);
     //const char *name = item_name(it);
     const char *sel =  item_description(it);
     if(sel && strcmp(sel, "MORE") == 0){
+        
         TRACE("main: more");
+        
         if (!search_api("MORE", painel_w)) {
             TRACE("main: Error searching more");
         }
-       
-
-        for(int j = 0; j < item_c; j++){
+        set_top_row(painel_w->menu, 0);
+        int item_c = item_count(painel_w->menu);
+        ITEM ** itens = menu_items(painel_w->menu);
+        for(int i = 0; i < item_c; ++i){
+            drive_menu(painel_w, REQ_DOWN_ITEM);
+            if(itens[i] == selected_items[i]){
+                drive_menu(painel_w, REQ_TOGGLE_ITEM);
+            }
            
         }
     }else{

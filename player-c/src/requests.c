@@ -151,7 +151,7 @@ buffer_t *http_post(const char *url, struct curl_slist *headers, cJSON *json) {
         return NULL;
     }
     TRACE("Setting post fields");
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, strlen(json_str));
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long) strlen(json_str));
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_str);
 
     TRACE("Setting write function");
