@@ -212,8 +212,6 @@ int search_api(char *path, window_t *w) {
     
     if(strcmp(path, "KILL") == 0){
         if(response_internal){
-            if(response_internal->path)
-                free(response_internal->path);
             if(response_internal->next)
                 free(response_internal->next);
             if(response_internal->items){
