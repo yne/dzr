@@ -857,7 +857,7 @@ void select_command(va_list args){
         ITEM ** itens = menu_items(painel_w->menu);
         for(int i = 0; i < item_c; ++i){
             drive_menu(painel_w, REQ_DOWN_ITEM);
-            if(itens[i] == selected_items[i]){
+            if(strcmp(item_description(itens[i]), item_description(selected_items[i])) == 0){
                 drive_menu(painel_w, REQ_TOGGLE_ITEM);
             }
            
