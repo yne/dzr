@@ -22,7 +22,7 @@ SNG_NFO=$(gw song.getListData "$DZR_SID" "$API_TOK" --data "{\"sng_ids\":[$SNG_I
 SNG_TOK=$(printf "%s" "$SNG_NFO" | jq '[.results.data[]|(.FALLBACK.TRACK_TOKEN//.TRACK_TOKEN)]')
 # reset to resolvable id, eg:no personal uploads (geoblocked track will fail later)
 SNG_IDS=$(printf "%s" "$SNG_NFO" | jq '[.results.data[]|(.FALLBACK.SNG_ID//.SNG_ID)]')
-URL_NFO=$(printf "{\"license_token\":\"%s\",\"media\":[{\"type\":\"FULL\",\"formats\":[{\"cipher\":\"BF_CBC_STRIPE\",\"format\":\"MP3_128\"}]}],\"track_tokens\":%s}" "$USR_LIC" "$SNG_TOK" | $FETCH 'https://media.deezer.com/v1/get_url' --data-binary @-)
+URL_NFO=$(printf "{\"license_token\":\"%s\",\"media\":[{\"type\":\"FULL\",\"formats\":[{\"cipher\":\"BF_CBC_STRIPE\",\"format\":\"${DZR_FMT:-MP3_128}\"}]}],\"track_tokens\":%s}" "$USR_LIC" "$SNG_TOK" | $FETCH 'https://media.deezer.com/v1/get_url' --data-binary @-)
 URL_IDS=$(printf "%s" "$URL_NFO" | jq --argjson ids "$SNG_IDS" '[.data , ($ids|map({id:.}))]|transpose|map(add)')
 printf "%s" "$URL_IDS" | jq -r '.[]|select(.errors)|[.errors[0].message     ,.id]|@tsv' 1>&2
 printf "%s" "$URL_IDS" | jq -r '.[]|select(.media )|[.media[].sources[0].url,.id]|@tsv'

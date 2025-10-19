@@ -44,7 +44,7 @@ async function browse(url_or_event_or_ids, label) {
 		} else { // fetch step
 			/**@type {{type:string,title_short:string,artist:{name:string},title_version:string,title:string,name:string,nb_tracks:string,id:number}[]} */
 			const data = [];
-			for (let n = conf().get('nextCount'), json, nextUrl = "https://api.deezer.com" + url; --n && (json = JSON.parse(await fetch(nextUrl))); nextUrl = json.next) {
+			for (let n = conf().get('nextCount'), json, nextUrl = "https://api.deezer.com" + url; --n && nextUrl && (json = JSON.parse(await fetch(nextUrl))); nextUrl = json.next) {
 				data.push(...(json.data?.tracks || json.data || json.tracks?.data));
 			}
 			const picked = !!url.match(/\/(playlist|album)\//);
@@ -70,13 +70,15 @@ const with_url = async (songs) => songs?.length ? await vscode.window.withProgre
 			{ ...opt, headers: { Cookie: `sid=${sid}; arl=${arl}`, ...opt?.headers } }, data)).results;
 		const base = "https://www.deezer.com/ajax/gw-light.php?input=3&api_version=1.0";
 		let DZR_ARL = next("ARL", conf().get('arl'));
+		const format = conf().get('format') || 'MP3_128';
 		if (!DZR_ARL) {
 			DZR_ARL = (await vscode.window.showInputBox({
 				ignoreFocusOut: true,
 				placeHolder: "deezer://autolog/xxxx",
 				prompt: "Login on [deezer.com](https://www.deezer.com/), then copy the button address displayed on [this page](https://www.deezer.com/desktop/login/electron/callback)"
-			}))?.match(/[0-9a-f]{192}/);
-			conf().update('arl', DZR_ARL, vscode.ConfigurationTarget.Global)
+			}))?.match(/[0-9a-f]{192}/)?.[0];
+			if (!DZR_ARL) return vscode.window.showErrorMessage("No ARL found");
+			conf().update('arl', DZR_ARL, vscode.ConfigurationTarget.Global);
 		}
 		DZR_PNG = next("session", DZR_PNG || await gw('deezer.ping', DZR_ARL));
 		USR_NFO = next("user right", USR_NFO || await gw('deezer.getUserData', DZR_ARL, DZR_PNG.SESSION));
@@ -84,7 +86,7 @@ const with_url = async (songs) => songs?.length ? await vscode.window.withProgre
 		const GET_URL = next("song stream", JSON.parse(await fetch('https://media.deezer.com/v1/get_url', { method: 'POST' }, JSON.stringify({
 			track_tokens: SNG_NFO.map(d => d.TRACK_TOKEN),
 			license_token: USR_NFO.USER.OPTIONS.license_token,
-			media: [{ type: "FULL", formats: [{ cipher: "BF_CBC_STRIPE", format: "MP3_128" }] }]
+			media: [{ type: "FULL", formats: [{ cipher: "BF_CBC_STRIPE", format }] }]
 		}))))?.data?.map((url, i) => Object.assign(SNG_NFO[i], url));
 		const errors = SNG_NFO.filter(e => e.errors).map(e => `[${e.SNG_ID}] ${e.ART_NAME} - ${e.SNG_TITLE}:${JSON.stringify(e.errors)}`);
 		const skiped = SNG_NFO.filter(s => !s.media?.[0]?.sources?.[0]?.url).map(e => `[${e.SNG_ID}] no MEDIA`);

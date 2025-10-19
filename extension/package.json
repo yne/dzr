@@ -196,6 +196,22 @@
 					"default": "",
 					"description": "Access Rights Locator"
 				},
+				"dzr.format": {
+					"type": "string",
+					"default": "MP3_128",
+					"enum": [
+						"AAC_64",
+						"FLAC",
+						"MP3_64",
+						"MP3_128",
+						"MP3_256",
+						"MP3_320",
+						"MP4_RA1",
+						"MP4_RA2",
+						"MP4_RA3"
+					],	
+					"description": "Requested format"
+				},
 				"dzr.nextCount": {
 					"type": "number",
 					"default": 5,
