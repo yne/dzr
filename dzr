@@ -10,7 +10,9 @@ if [ "$REQUEST_METHOD" = "HEAD" ] ; then
 	printf 'Access-Control-Allow-Origin: *\ndzr-api: 0\n\n'
 elif [ "$REQUEST_METHOD" = "GET" ] ; then
 	printf "Cache-Control: max-age=31536000, immutable\nContent-Type: audio/mpeg\n\n"
-	echo "$QUERY_STRING" | xargs basename | xargs $0-url | while read url id; do
+	echo "$QUERY_STRING" | xargs basename | xargs $0-url | while IFS= read -r line; do
+		url=$(printf '%s\n' "$line" | cut -f1)
+		id=$(printf '%s\n' "$line" | cut -f2)
 		$FETCH "$url" | $DZR_SPONGE | $0-dec $id
 	done
 fi
@@ -85,7 +87,11 @@ dzr_artist_0() { $DLG_LIST top?limit=100 '' albums '' fans '' related '' radio '
 dzr_loved()    { gw_loved | jq "$GW_FMT_LIST" | xargs $DLG_LIST ▸ "play all /track/" ⇄ "shuf all /track/" ;}
 dzr_default()  { $FETCH -H "Accept-Language: $LANG" "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST ▸ "play all /track/" ⇄ "shuf all /track/" ;}
 play() { # receive /track/1,2,3 from stdin
-	xargs basename | xargs $SELF-url | ${1:-cat} | while read url id; do
+	xargs basename | xargs $SELF-url | ${1:-cat} | while IFS= read -r line; do
+		url=$(printf '%s\n' "$line" | cut -f1)
+		id=$(printf '%s\n' "$line" | cut -f2)
+		info=$(printf '%s\n' "$line" | cut -f3-)
+		[ -n "$info" ] && printf '🎶 %s\n' "$info" >&2
 		$FETCH "$url" | $DZR_SPONGE | $SELF-dec $id | eval ${PLAYER:-'mpv -'} || break # stop if Ctrl+C : $? = 4
 	done
 }
