@@ -55,6 +55,7 @@ done
 [ -n "$UNMET_DEPENDENCIES" ] && exit 1;
 
 # main
+SELF=$(command -v "$0") || SELF="$0"
 API="api.deezer.com"
 DLG_LIST="dialog --keep-tite --output-fd 1 --menu $1: 0 0 0"
 DLG_TEXT="dialog --keep-tite --output-fd 1 --inputbox $1: 0 0"
@@ -70,8 +71,8 @@ dzr_user_0()   { $DLG_LIST charts '' albums '' playlists '' flow '' tracks '' ar
 dzr_artist_0() { $DLG_LIST top?limit=100 '' albums '' fans '' related '' radio '' playlists '' ;}
 dzr_default()  { $FETCH -H "Accept-Language: $LANG" "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST ▸ "play all /track/" ⇄ "shuf all /track/" ;}
 play() { # receive /track/1,2,3 from stdin
-	xargs basename | xargs $0-url | ${1:-cat} | while read url id; do
-		$FETCH "$url" | $DZR_SPONGE | $0-dec $id | eval ${PLAYER:-'mpv -'} || break # stop if Ctrl+C : $? = 4
+	xargs basename | xargs $SELF-url | ${1:-cat} | while read url id; do
+		$FETCH "$url" | $DZR_SPONGE | $SELF-dec $id | eval ${PLAYER:-'mpv -'} || break # stop if Ctrl+C : $? = 4
 	done
 }
 for url in "$@"; do
@@ -82,14 +83,14 @@ for url in "$@"; do
 		*/0) url="$url$($DLG_TEXT ''|jq -rR '.|@uri')" ;; # escaped id
 		/track/*) echo $url | play; break ;;
 	esac
-	echo "$0 $url" >&2
+	echo "$SELF $url" >&2
 	while path=$($FUNC $url); do # browse REPL
 		case "$path" in
 		▸) echo "$API$url"; $FETCH "$API$url" | jq "$FMT_TRKS" | play cat; break ;;
 		⇄) echo "$API$url"; $FETCH "$API$url" | jq "$FMT_TRKS" | play shuf; break ;;
-		/*) $0 "$path";;
-		*)  $0 "$url/$path";;
+		/*) $SELF "$path";;
+		*)  $SELF "$url/$path";;
 		esac
 	done
 done
-[ $# -eq 0 ] && $0 '' # give an argument to iterate over (if none given)
+[ $# -eq 0 ] && $SELF '' # give an argument to iterate over (if none given)
