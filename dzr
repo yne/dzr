@@ -6,6 +6,7 @@
 FETCH=${FETCH:-curl -s} # FETCH="wget -q -O -" or FETCH="curl -s -k"
 PLAYER=${PLAYER:-'mpv -'} # PLAYER="ffplay -"
 DZR_SPONGE=${DZR_SPONGE:-cat -} # DZR_SPONGE="sponge" from package "moreutils"
+[ -f ~/.dzrrc ] && . ~/.dzrrc && export DZR_CBC DZR_ARL
 if [ "$REQUEST_METHOD" = "HEAD" ] ; then
 	printf 'Access-Control-Allow-Origin: *\ndzr-api: 0\n\n'
 elif [ "$REQUEST_METHOD" = "GET" ] ; then
@@ -22,14 +23,12 @@ fi
 unscramble(){ printf "${8}${16}${7}${15}${6}${14}${5}${13}${4}${12}${3}${11}${2}${10}${1}${9}";}
 if [ -z "$DZR_CBC" ]; then
 	command -v $(echo "$FETCH" | cut -f 1 -d " ") >/dev/null || { echo "key extraction require $FETCH" 1>&2 ; exit 1 ;}
-	printf "Add the following to your shell profile e.g. ~/.profile or ~/.zshrc:\n" >&2
 	APP_WEB=$($FETCH -L deezer.com/en/channels/explore | sed -n 's/.*src="\([^"]*app-web[^"]*\).*/\1/p' | xargs $FETCH -L)
 	TMP_CBC=$(echo "$APP_WEB"  | tr ,_ '\n'  | sed -n 's/.*\(%5B0x..%2C.\{39\}%2C0x..%5D\).*/\1/p' | sed 's/%../\n/g' | xargs printf '\\%o ')
 	export DZR_CBC=$(unscramble $TMP_CBC);
-	printf "    export DZR_CBC=$DZR_CBC" >&2
 	[ "-$@" = "-!" ] && printf '%s' "$DZR_CBC" && exit
-	sleep 2 # give time to read the warning
-	echo
+	grep -q '^DZR_CBC=' ~/.dzrrc 2>/dev/null && sed -i "s/^DZR_CBC=.*/DZR_CBC=$DZR_CBC/" ~/.dzrrc || echo "DZR_CBC=$DZR_CBC" >> ~/.dzrrc
+	printf "DZR_CBC saved to ~/.dzrrc\n" >&2
 fi
 if [ -z "$DZR_ARL" ]; then
 	echo "Starting on 2025-03-08, Anonymous playback are blocked."
@@ -45,10 +44,8 @@ if [ -z "$DZR_ARL" ]; then
 		echo "Invalid ARL format (expect: ^[0-9a-f]+$):"
 		echo $DZR_ARL
 	done
-	printf "To skip this message, add the following line to your shell profile (e.g. ~/.profile or ~/.zshrc):\n" >&2
-	echo "    export DZR_ARL=$DZR_ARL"
-	sleep 2 # give time to read the warning
-	echo
+	grep -q '^DZR_ARL=' ~/.dzrrc 2>/dev/null && sed -i "s/^DZR_ARL=.*/DZR_ARL=$DZR_ARL/" ~/.dzrrc || echo "DZR_ARL=$DZR_ARL" >> ~/.dzrrc
+	printf "DZR_ARL saved to ~/.dzrrc\n" >&2
 fi
 # dependencies check, see: https://github.com/yne/dzr/issues/12
 for c in jq curl dialog openssl $(echo "$PLAYER" | cut -f 1 -d " "); do
