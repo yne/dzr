@@ -62,6 +62,7 @@ if [ -n "$DZR_ARL" ] && [ -z "$DZR_LOVED" ]; then
 	_DZR_SID=$($FETCH "www.deezer.com/ajax/gw-light.php?method=deezer.ping&api_version=1.0&api_token" | jq -r .results.SESSION)
 	_DZR_USR=$($FETCH "$GW?method=deezer.getUserData&input=3&api_version=1.0&api_token=" --header "Cookie: sid=$_DZR_SID; arl=$DZR_ARL" -d '{}')
 	export DZR_LOVED=$(printf "%s" "$_DZR_USR" | jq -r .results.USER.LOVEDTRACKS_ID)
+	export DZR_USER_ID=$(printf "%s" "$_DZR_USR" | jq -r .results.USER.USER_ID)
 	export DZR_SID="$_DZR_SID"
 	export DZR_API_TOK=$(printf "%s" "$_DZR_USR" | jq -r .results.checkForm)
 fi
@@ -78,14 +79,16 @@ FMT_FUNC='s@[,?].*@@;s@[^a-zA-Z0-9]\{1,\}@_@g;s@[0-9,]\{1,\}@0@g;s@_\{1,\}$@@'
 GW_FMT_LIST='(.results.data[]|("/track/"+(.SNG_ID|tostring), (.SNG_TITLE+" "+.ART_NAME|gsub("\\x22";""))))'
 GW_FMT_TRKS='"/track/"+([.results.data[]|.SNG_ID]|map(tostring)|join(","))'
 gw_loved() { $FETCH "$GW?method=playlist.getSongs&input=3&api_version=1.0&api_token=$DZR_API_TOK" --header "Cookie: sid=$DZR_SID; arl=$DZR_ARL" -d "{\"playlist_id\":\"$DZR_LOVED\",\"start\":0,\"nb\":10000}" ;}
+gw_flow()  { $FETCH "$GW?method=radio.getUserRadio&input=3&api_version=1.0&api_token=$DZR_API_TOK" --header "Cookie: sid=$DZR_SID; arl=$DZR_ARL" -d "{\"user_id\":\"$DZR_USER_ID\"}" ;}
 
-dzr()          { $DLG_LIST ${DZR_LOVED:+/loved 'my favourites'} /search/track?q= 'by name' /search/artist?q= 'by name' /search/album?q= 'by name' /search/playlist?q= 'by name' /search/user?q= 'by name' /search/radio?q= 'by name' /genre 'list' /radio 'list' /user/0 'by id' ;} 
+dzr()          { $DLG_LIST ${DZR_LOVED:+/loved 'my favourites'} ${DZR_USER_ID:+/flow 'dynamic radio'} /search/track?q= 'by name' /search/artist?q= 'by name' /search/album?q= 'by name' /search/playlist?q= 'by name' /search/user?q= 'by name' /search/radio?q= 'by name' /genre 'list' /radio 'list' /user/0 'by id' ;} 
 dzr_genre_0()  { $DLG_LIST radios '' artists '' ;}
 dzr_radio_0()  { $DLG_LIST tracks '' fans '' ;}
 dzr_album_0()  { $DLG_LIST tracks?limit=999 '' fans '' ;}
 dzr_user_0()   { $DLG_LIST charts '' albums '' playlists '' flow '' tracks '' artists '' ;}
 dzr_artist_0() { $DLG_LIST top?limit=100 '' albums '' fans '' related '' radio '' playlists '' ;}
 dzr_loved()    { gw_loved | jq "$GW_FMT_LIST" | xargs $DLG_LIST ▸ "play all /track/" ⇄ "shuf all /track/" ;}
+dzr_flow()     { gw_flow | jq "$GW_FMT_LIST" | xargs $DLG_LIST ▸ "play all /track/" ⇄ "shuf all /track/" ∞ "continuous flow" ;}
 dzr_default()  { $FETCH -H "Accept-Language: $LANG" "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST ▸ "play all /track/" ⇄ "shuf all /track/" ;}
 play() { # receive /track/1,2,3 from stdin
 	xargs basename | xargs $SELF-url | ${1:-cat} | while IFS= read -r line; do
@@ -107,8 +110,9 @@ for url in "$@"; do
 	echo "$SELF $url" >&2
 	while path=$($FUNC $url); do # browse REPL
 		case "$path" in
-		▸) if [ "$FUNC" = "dzr_loved" ]; then gw_loved | jq "$GW_FMT_TRKS" | play cat; else $FETCH "$API$url" | jq "$FMT_TRKS" | play cat; fi; break ;;
-		⇄) if [ "$FUNC" = "dzr_loved" ]; then gw_loved | jq "$GW_FMT_TRKS" | play shuf; else $FETCH "$API$url" | jq "$FMT_TRKS" | play shuf; fi; break ;;
+		▸) if [ "$FUNC" = "dzr_loved" ]; then gw_loved | jq "$GW_FMT_TRKS" | play cat; elif [ "$FUNC" = "dzr_flow" ]; then gw_flow | jq "$GW_FMT_TRKS" | play cat; else $FETCH "$API$url" | jq "$FMT_TRKS" | play cat; fi; break ;;
+		⇄) if [ "$FUNC" = "dzr_loved" ]; then gw_loved | jq "$GW_FMT_TRKS" | play shuf; elif [ "$FUNC" = "dzr_flow" ]; then gw_flow | jq "$GW_FMT_TRKS" | play shuf; else $FETCH "$API$url" | jq "$FMT_TRKS" | play shuf; fi; break ;;
+		∞) while true; do gw_flow | jq "$GW_FMT_TRKS" | play cat || break; done; break ;;
 		/*) $SELF "$path";;
 		*)  $SELF "$url/$path";;
 		esac
