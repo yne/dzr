@@ -89,6 +89,7 @@ dzr_flow()     { gw_flow | jq "$GW_FMT_LIST" | xargs $DLG_LIST ▸ "play all /tr
 dzr_default()  { $FETCH -H "Accept-Language: $LANG" "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST ▸ "play all /track/" ⇄ "shuf all /track/" ;}
 play() { # receive /track/1,2,3 from stdin
 	xargs basename | xargs $SELF-url | ${1:-cat} | while IFS= read -r line; do
+		printf '%s\n' "$line" | grep -q '	' || { echo "error: unexpected dzr-url output: $line" >&2; break; }
 		url=$(printf '%s\n' "$line" | cut -f1)
 		id=$(printf '%s\n' "$line" | cut -f2)
 		info=$(printf '%s\n' "$line" | cut -f3-)
