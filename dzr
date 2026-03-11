@@ -6,7 +6,8 @@
 FETCH=${FETCH:-curl -s} # FETCH="wget -q -O -" or FETCH="curl -s -k"
 PLAYER=${PLAYER:-'mpv -'} # PLAYER="ffplay -"
 DZR_SPONGE=${DZR_SPONGE:-cat -} # DZR_SPONGE="sponge" from package "moreutils"
-[ -f ~/.dzrrc ] && . ~/.dzrrc && export DZR_CBC DZR_ARL
+DZR_RC="${DZR_RC:-${XDG_CONFIG_HOME:-$HOME/.config}/dzrrc}"
+[ -f "$DZR_RC" ] && . "$DZR_RC" && export DZR_CBC DZR_ARL
 if [ "$REQUEST_METHOD" = "HEAD" ] ; then
 	printf 'Access-Control-Allow-Origin: *\ndzr-api: 0\n\n'
 elif [ "$REQUEST_METHOD" = "GET" ] ; then
@@ -27,8 +28,9 @@ if [ -z "$DZR_CBC" ]; then
 	TMP_CBC=$(echo "$APP_WEB"  | tr ,_ '\n'  | sed -n 's/.*\(%5B0x..%2C.\{39\}%2C0x..%5D\).*/\1/p' | sed 's/%../\n/g' | xargs printf '\\%o ')
 	export DZR_CBC=$(unscramble $TMP_CBC);
 	[ "-$@" = "-!" ] && printf '%s' "$DZR_CBC" && exit
-	grep -q '^DZR_CBC=' ~/.dzrrc 2>/dev/null && sed -i "s/^DZR_CBC=.*/DZR_CBC=$DZR_CBC/" ~/.dzrrc || echo "DZR_CBC=$DZR_CBC" >> ~/.dzrrc
-	printf "DZR_CBC saved to ~/.dzrrc\n" >&2
+	mkdir -p "$(dirname "$DZR_RC")"
+	grep -q '^DZR_CBC=' "$DZR_RC" 2>/dev/null && sed -i "s/^DZR_CBC=.*/DZR_CBC=$DZR_CBC/" "$DZR_RC" || echo "DZR_CBC=$DZR_CBC" >> "$DZR_RC"
+	printf "DZR_CBC saved to %s\n" "$DZR_RC" >&2
 fi
 if [ -z "$DZR_ARL" ]; then
 	echo "Starting on 2025-03-08, Anonymous playback are blocked."
@@ -44,8 +46,9 @@ if [ -z "$DZR_ARL" ]; then
 		echo "Invalid ARL format (expect: ^[0-9a-f]+$):"
 		echo $DZR_ARL
 	done
-	grep -q '^DZR_ARL=' ~/.dzrrc 2>/dev/null && sed -i "s/^DZR_ARL=.*/DZR_ARL=$DZR_ARL/" ~/.dzrrc || echo "DZR_ARL=$DZR_ARL" >> ~/.dzrrc
-	printf "DZR_ARL saved to ~/.dzrrc\n" >&2
+	mkdir -p "$(dirname "$DZR_RC")"
+	grep -q '^DZR_ARL=' "$DZR_RC" 2>/dev/null && sed -i "s/^DZR_ARL=.*/DZR_ARL=$DZR_ARL/" "$DZR_RC" || echo "DZR_ARL=$DZR_ARL" >> "$DZR_RC"
+	printf "DZR_ARL saved to %s\n" "$DZR_RC" >&2
 fi
 # dependencies check, see: https://github.com/yne/dzr/issues/12
 for c in jq curl dialog openssl $(echo "$PLAYER" | cut -f 1 -d " "); do
