@@ -102,6 +102,7 @@ FMT_ARTIST='(.results.data[]|("/artist/"+(.ART_ID|tostring), (.ART_NAME|gsub("\\
 FMT_ALBUM='(.results.data[]|("/album/"+(.ALB_ID|tostring), ((.ALB_TITLE+" "+.ART_NAME)|gsub("\\x22";""))))'
 FMT_DISCOG='(.results.data[]|("/album/"+(.ALB_ID|tostring), ((.ALB_TITLE+" ("+(.PHYSICAL_RELEASE_DATE//""|split("-")[0])+")")|gsub("\\x22";""))))'
 FMT_PLAYLIST='(.results.data[]|("/playlist/"+(.PLAYLIST_ID|tostring), (.TITLE|gsub("\\x22";""))))'
+FMT_MY_PLAYLIST='(.results.PLAYLISTS.data[]|select(.TYPE!="4")|("/playlist/"+(.PLAYLIST_ID|tostring), ((.TITLE+" ("+(.NB_SONG|tostring)+")")|gsub("\\x22";""))))'
 FMT_RADIO='(.results.data[]|("/radio/"+(.RADIO_ID|tostring), (.TITLE|gsub("\\x22";""))))'
 
 # public API for browse-only endpoints (no gw-light equivalent)
@@ -112,8 +113,9 @@ PUB_FMT_RADIO='(.data[]|("/radio/"+(.id|tostring), (.title|gsub("\\x22";""))))'
 # -- menu functions --
 dzr() {
 	$DLG_LIST \
-		/loved 'my favourites' \
 		/flow 'my personalised mix' \
+		/loved 'my favourites' \
+		/playlists 'my playlists' \
 		/search/track?q= 'search track' \
 		/search/artist?q= 'search artist' \
 		/search/album?q= 'search album' \
@@ -123,8 +125,9 @@ dzr() {
 		/radio 'list radios'
 }
 
-dzr_loved()            { gw_loved | jq "$GW_FMT_LIST" | xargs $DLG_LIST ▸ "play all" ⇄ "shuffle" ;}
 dzr_flow()             { gw_flow | jq "$GW_FMT_LIST" | xargs $DLG_LIST ∞ "continuous flow" ▸ "play all" ⇄ "shuffle" ;}
+dzr_loved()            { gw_loved | jq "$GW_FMT_LIST" | xargs $DLG_LIST ▸ "play all" ⇄ "shuffle" ;}
+dzr_playlists()        { gw deezer.userMenu '{}' | jq "$FMT_MY_PLAYLIST" | xargs $DLG_LIST ;}
 # search
 dzr_search_track()     { gw_search_track "$1" | jq "$GW_FMT_LIST" | xargs $DLG_LIST ▸ "play all" ⇄ "shuffle" ;}
 dzr_search_artist()    { gw_search_artist "$1" | jq "$FMT_ARTIST" | xargs $DLG_LIST ;}
@@ -164,8 +167,8 @@ play() { # receive /track/1,2,3 from stdin
 # play_all: call the gw fetcher for this context, extract track IDs, play
 play_all() { # $1=url $2=FUNC $3=order(cat|shuf)
 	case "$2" in
-	dzr_loved)          gw_loved ;;
 	dzr_flow)           gw_flow ;;
+	dzr_loved)          gw_loved ;;
 	dzr_search_track)   gw_search_track "$1" ;;
 	dzr_artist_0_top)   gw_artist_top "$1" ;;
 	dzr_artist_0_radio) gw_artist_radio "$1" ;;
