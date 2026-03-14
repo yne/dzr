@@ -65,6 +65,7 @@ if [ -n "$DZR_ARL" ] && [ -z "$DZR_SID" ]; then
 	export DZR_LOVED=$(printf "%s" "$_DZR_USR" | jq -r .results.USER.LOVEDTRACKS_ID)
 	export DZR_USER_ID=$(printf "%s" "$_DZR_USR" | jq -r .results.USER.USER_ID)
 	export DZR_API_TOK=$(printf "%s" "$_DZR_USR" | jq -r .results.checkForm)
+	export DZR_LIC=$(printf "%s" "$_DZR_USR" | jq -r .results.USER.OPTIONS.license_token)
 fi
 
 # main

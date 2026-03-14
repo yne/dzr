@@ -10,16 +10,19 @@ gw () {
 }
 
 [ -z "$SNG_IDS" ] && echo "USAGE: dzr-url 5404528,664107" >&2 && exit 1
-DZR_URL="www.deezer.com/ajax/gw-light.php?method=deezer.ping&api_version=1.0&api_token"
-DZR_SID=$($FETCH "$DZR_URL" | jq -r .results.SESSION)
-[ -z "$DZR_SID" ] || [ "$DZR_SID" = "null" ] && echo "error: deezer.ping failed (no session)" >&2 && exit 1
-USR_NFO=$(gw deezer.getUserData "$DZR_SID" "$API_TOK")
-USR_TOK=$(printf "%s" "$USR_NFO" | jq -r .results.USER_TOKEN)
-USR_LIC=$(printf "%s" "$USR_NFO" | jq -r .results.USER.OPTIONS.license_token)
-API_TOK=$(printf "%s" "$USR_NFO" | jq -r .results.checkForm)
-[ -z "$USR_LIC" ] || [ "$USR_LIC" = "null" ] && echo "error: getUserData failed (no license token)" >&2 && exit 1
-[ -z "$API_TOK" ] || [ "$API_TOK" = "null" ] && echo "error: getUserData failed (no api token)" >&2 && exit 1
-#printf "SID=$DZR_SID\nAPI=$API_TOK\nLIC=$USR_LIC\nTOK=$USR_TOK\nIDS=$SNG_IDS\n" 1>&2
+# reuse session from parent dzr process, or create a new one
+if [ -n "$DZR_SID" ] && [ -n "$DZR_API_TOK" ] && [ -n "$DZR_LIC" ]; then
+	API_TOK="$DZR_API_TOK"
+	USR_LIC="$DZR_LIC"
+else
+	DZR_SID=$($FETCH "www.deezer.com/ajax/gw-light.php?method=deezer.ping&api_version=1.0&api_token" | jq -r .results.SESSION)
+	[ -z "$DZR_SID" ] || [ "$DZR_SID" = "null" ] && echo "error: deezer.ping failed (no session)" >&2 && exit 1
+	USR_NFO=$(gw deezer.getUserData "$DZR_SID" "$API_TOK")
+	USR_LIC=$(printf "%s" "$USR_NFO" | jq -r .results.USER.OPTIONS.license_token)
+	API_TOK=$(printf "%s" "$USR_NFO" | jq -r .results.checkForm)
+	[ -z "$USR_LIC" ] || [ "$USR_LIC" = "null" ] && echo "error: getUserData failed (no license token)" >&2 && exit 1
+	[ -z "$API_TOK" ] || [ "$API_TOK" = "null" ] && echo "error: getUserData failed (no api token)" >&2 && exit 1
+fi
 
 SNG_NFO=$(gw song.getListData "$DZR_SID" "$API_TOK" --data "{\"sng_ids\":[$SNG_IDS]}")
 printf "%s" "$SNG_NFO" | jq -e '.results.data // empty' >/dev/null 2>&1 || { echo "error: song.getListData returned no data" >&2; exit 1; }
