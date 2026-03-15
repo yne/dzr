@@ -85,6 +85,9 @@ _q()  { echo "$1" | sed 's/.*q=//'; }             # /search/track?q=foo -> foo
 # -- gw data fetchers (raw JSON, reused by browse + play) --
 gw_loved()           { gw playlist.getSongs "{\"playlist_id\":\"$DZR_LOVED\",\"start\":0,\"nb\":10000}"; }
 gw_flow()            { gw radio.getUserRadio "{\"user_id\":\"$DZR_USER_ID\"}"; }
+gw_playlists()       { gw deezer.userMenu '{}'; }
+gw_artists()         { gw deezer.pageProfile "{\"user_id\":\"$DZR_USER_ID\",\"tab\":\"artists\",\"start\":0,\"nb\":10000}"; }
+gw_albums()          { gw deezer.pageProfile "{\"user_id\":\"$DZR_USER_ID\",\"tab\":\"albums\",\"start\":0,\"nb\":10000}"; }
 gw_search_track()    { gw search.music "{\"query\":\"$(_q "$1")\",\"filter\":\"ALL\",\"output\":\"TRACK\",\"start\":0,\"nb\":50}"; }
 gw_search_artist()   { gw search.music "{\"query\":\"$(_q "$1")\",\"filter\":\"ALL\",\"output\":\"ARTIST\",\"start\":0,\"nb\":50}"; }
 gw_search_album()    { gw search.music "{\"query\":\"$(_q "$1")\",\"filter\":\"ALL\",\"output\":\"ALBUM\",\"start\":0,\"nb\":50}"; }
@@ -104,6 +107,8 @@ FMT_ALBUM='(.results.data[]|("/album/"+(.ALB_ID|tostring), ((.ALB_TITLE+" "+.ART
 FMT_DISCOG='(.results.data[]|("/album/"+(.ALB_ID|tostring), ((.ALB_TITLE+" ("+(.PHYSICAL_RELEASE_DATE//""|split("-")[0])+")")|gsub("\\x22";""))))'
 FMT_PLAYLIST='(.results.data[]|("/playlist/"+(.PLAYLIST_ID|tostring), (.TITLE|gsub("\\x22";""))))'
 FMT_MY_PLAYLIST='(.results.PLAYLISTS.data[]|select(.TYPE!="4")|("/playlist/"+(.PLAYLIST_ID|tostring), ((.TITLE+" ("+(.NB_SONG|tostring)+")")|gsub("\\x22";""))))'
+FMT_MY_ARTIST='(.results.TAB.artists.data[]|("/artist/"+(.ART_ID|tostring), (.ART_NAME|gsub("\\x22";""))))'
+FMT_MY_ALBUM='(.results.TAB.albums.data[]|("/album/"+(.ALB_ID|tostring), ((.ALB_TITLE+" "+.ART_NAME)|gsub("\\x22";""))))'
 FMT_RADIO='(.results.data[]|("/radio/"+(.RADIO_ID|tostring), (.TITLE|gsub("\\x22";""))))'
 
 # public API for browse-only endpoints (no gw-light equivalent)
@@ -117,6 +122,8 @@ dzr() {
 		/flow 'my personalised mix' \
 		/loved 'my favourites' \
 		/playlists 'my playlists' \
+		/artists 'my artists' \
+		/albums 'my albums' \
 		/search/track?q= 'search track' \
 		/search/artist?q= 'search artist' \
 		/search/album?q= 'search album' \
@@ -128,7 +135,9 @@ dzr() {
 
 dzr_flow()             { gw_flow | jq "$GW_FMT_LIST" | xargs $DLG_LIST ∞ "continuous flow" ▸ "play all" ⇄ "shuffle" ;}
 dzr_loved()            { gw_loved | jq "$GW_FMT_LIST" | xargs $DLG_LIST ▸ "play all" ⇄ "shuffle" ;}
-dzr_playlists()        { gw deezer.userMenu '{}' | jq "$FMT_MY_PLAYLIST" | xargs $DLG_LIST ;}
+dzr_playlists()        { gw_playlists | jq "$FMT_MY_PLAYLIST" | xargs $DLG_LIST ;}
+dzr_artists()          { gw_artists | jq "$FMT_MY_ARTIST" | xargs $DLG_LIST ;}
+dzr_albums()           { gw_albums | jq "$FMT_MY_ALBUM" | xargs $DLG_LIST ;}
 # search
 dzr_search_track()     { gw_search_track "$1" | jq "$GW_FMT_LIST" | xargs $DLG_LIST ▸ "play all" ⇄ "shuffle" ;}
 dzr_search_artist()    { gw_search_artist "$1" | jq "$FMT_ARTIST" | xargs $DLG_LIST ;}
