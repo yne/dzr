@@ -4,25 +4,35 @@
 
 SNG_IDS=$(printf "%s" "$*" | sed 's/ /,/g')
 FETCH=${FETCH:-curl -s} # FETCH="wget -q -O -" or FETCH="curl -s -k"
+die() { echo "$1" >&2; exit 1; }
 gw () {
   method="$1"; session="$2" ;apiToken="$3" ; shift 3 # curl args ...
   $FETCH "https://www.deezer.com/ajax/gw-light.php?method=$method&input=3&api_version=1.0&api_token=$apiToken" --header "Cookie: sid=$session; arl=$DZR_ARL" "$@"
 }
 
-[ -z "$SNG_IDS" ] && echo "USAGE: dzr-url 5404528,664107" && exit 1
-DZR_URL="www.deezer.com/ajax/gw-light.php?method=deezer.ping&api_version=1.0&api_token"
-DZR_SID=$($FETCH "$DZR_URL" | jq -r .results.SESSION)
-USR_NFO=$(gw deezer.getUserData "$DZR_SID" "$API_TOK")
-USR_TOK=$(printf "%s" "$USR_NFO" | jq -r .results.USER_TOKEN)
-USR_LIC=$(printf "%s" "$USR_NFO" | jq -r .results.USER.OPTIONS.license_token)
-API_TOK=$(printf "%s" "$USR_NFO" | jq -r .results.checkForm)
-#printf "SID=$DZR_SID\nAPI=$API_TOK\nLIC=$USR_LIC\nTOK=$USR_TOK\nIDS=$SNG_IDS\n" 1>&2
+[ -z "$SNG_IDS" ] && die "USAGE: dzr-url 5404528,664107"
+# reuse session from parent dzr process, or create a new one
+if [ -n "$DZR_SID" ] && [ -n "$DZR_API_TOK" ] && [ -n "$DZR_LIC" ]; then
+	API_TOK="$DZR_API_TOK"
+	USR_LIC="$DZR_LIC"
+else
+	DZR_SID=$($FETCH "www.deezer.com/ajax/gw-light.php?method=deezer.ping&api_version=1.0&api_token" | jq -r .results.SESSION)
+	[ -z "$DZR_SID" ] || [ "$DZR_SID" = "null" ] && die "error: deezer.ping failed (no session)"
+	USR_NFO=$(gw deezer.getUserData "$DZR_SID" "$API_TOK")
+	USR_LIC=$(printf "%s" "$USR_NFO" | jq -r .results.USER.OPTIONS.license_token)
+	API_TOK=$(printf "%s" "$USR_NFO" | jq -r .results.checkForm)
+	[ -z "$USR_LIC" ] || [ "$USR_LIC" = "null" ] && die "error: getUserData failed (no license token)"
+	[ -z "$API_TOK" ] || [ "$API_TOK" = "null" ] && die "error: getUserData failed (no api token)"
+fi
 
 SNG_NFO=$(gw song.getListData "$DZR_SID" "$API_TOK" --data "{\"sng_ids\":[$SNG_IDS]}")
+printf "%s" "$SNG_NFO" | jq -e '.results.data // empty' >/dev/null 2>&1 || die "error: song.getListData returned no data"
 SNG_TOK=$(printf "%s" "$SNG_NFO" | jq '[.results.data[]|(.FALLBACK.TRACK_TOKEN//.TRACK_TOKEN)]')
 # reset to resolvable id, eg:no personal uploads (geoblocked track will fail later)
 SNG_IDS=$(printf "%s" "$SNG_NFO" | jq '[.results.data[]|(.FALLBACK.SNG_ID//.SNG_ID)]')
+SNG_INF=$(printf "%s" "$SNG_NFO" | jq '[.results.data[]|"\(.ART_NAME) - \(.SNG_TITLE)\(if .VERSION != "" then " \(.VERSION)" else "" end) [\(.ALB_TITLE)] (\(.DURATION|tonumber|"\(./60|floor):\(. % 60|tostring|if length<2 then "0"+. else . end)"))"]')
 URL_NFO=$(printf "{\"license_token\":\"%s\",\"media\":[{\"type\":\"FULL\",\"formats\":[{\"cipher\":\"BF_CBC_STRIPE\",\"format\":\"${DZR_FMT:-MP3_128}\"}]}],\"track_tokens\":%s}" "$USR_LIC" "$SNG_TOK" | $FETCH 'https://media.deezer.com/v1/get_url' --data-binary @-)
-URL_IDS=$(printf "%s" "$URL_NFO" | jq --argjson ids "$SNG_IDS" '[.data , ($ids|map({id:.}))]|transpose|map(add)')
+printf "%s" "$URL_NFO" | jq -e '.data // empty' >/dev/null 2>&1 || die "error: get_url returned no data"
+URL_IDS=$(printf "%s" "$URL_NFO" | jq --argjson ids "$SNG_IDS" --argjson inf "$SNG_INF" '[.data , ($ids|map({id:.})) , ($inf|map({info:.}))]|transpose|map(add)')
 printf "%s" "$URL_IDS" | jq -r '.[]|select(.errors)|[.errors[0].message     ,.id]|@tsv' 1>&2
-printf "%s" "$URL_IDS" | jq -r '.[]|select(.media )|[.media[].sources[0].url,.id]|@tsv'
+printf "%s" "$URL_IDS" | jq -r '.[]|select(.media[0].sources[0].url)|[.media[0].sources[0].url,.id,.info]|@tsv'

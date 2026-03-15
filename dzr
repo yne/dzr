@@ -6,11 +6,15 @@
 FETCH=${FETCH:-curl -s} # FETCH="wget -q -O -" or FETCH="curl -s -k"
 PLAYER=${PLAYER:-'mpv -'} # PLAYER="ffplay -"
 DZR_SPONGE=${DZR_SPONGE:-cat -} # DZR_SPONGE="sponge" from package "moreutils"
+DZR_RC="${DZR_RC:-${XDG_CONFIG_HOME:-$HOME/.config}/dzrrc}"
+[ -f "$DZR_RC" ] && . "$DZR_RC" && export DZR_CBC DZR_ARL
 if [ "$REQUEST_METHOD" = "HEAD" ] ; then
 	printf 'Access-Control-Allow-Origin: *\ndzr-api: 0\n\n'
 elif [ "$REQUEST_METHOD" = "GET" ] ; then
 	printf "Cache-Control: max-age=31536000, immutable\nContent-Type: audio/mpeg\n\n"
-	echo "$QUERY_STRING" | xargs basename | xargs $0-url | while read url id; do
+	echo "$QUERY_STRING" | xargs basename | xargs $0-url | while IFS= read -r line; do
+		url=$(printf '%s\n' "$line" | cut -f1)
+		id=$(printf '%s\n' "$line" | cut -f2)
 		$FETCH "$url" | $DZR_SPONGE | $0-dec $id
 	done
 fi
@@ -20,14 +24,13 @@ fi
 unscramble(){ printf "${8}${16}${7}${15}${6}${14}${5}${13}${4}${12}${3}${11}${2}${10}${1}${9}";}
 if [ -z "$DZR_CBC" ]; then
 	command -v $(echo "$FETCH" | cut -f 1 -d " ") >/dev/null || { echo "key extraction require $FETCH" 1>&2 ; exit 1 ;}
-	printf "Add the following to your shell profile e.g. ~/.profile or ~/.zshrc:\n" >&2
 	APP_WEB=$($FETCH -L deezer.com/en/channels/explore | sed -n 's/.*src="\([^"]*app-web[^"]*\).*/\1/p' | xargs $FETCH -L)
 	TMP_CBC=$(echo "$APP_WEB"  | tr ,_ '\n'  | sed -n 's/.*\(%5B0x..%2C.\{39\}%2C0x..%5D\).*/\1/p' | sed 's/%../\n/g' | xargs printf '\\%o ')
 	export DZR_CBC=$(unscramble $TMP_CBC);
-	printf "    export DZR_CBC=$DZR_CBC" >&2
 	[ "-$@" = "-!" ] && printf '%s' "$DZR_CBC" && exit
-	sleep 2 # give time to read the warning
-	echo
+	mkdir -p "$(dirname "$DZR_RC")"
+	grep -q '^DZR_CBC=' "$DZR_RC" 2>/dev/null && sed -i "s/^DZR_CBC=.*/DZR_CBC=$DZR_CBC/" "$DZR_RC" || echo "DZR_CBC=$DZR_CBC" >> "$DZR_RC"
+	printf "DZR_CBC saved to %s\n" "$DZR_RC" >&2
 fi
 if [ -z "$DZR_ARL" ]; then
 	echo "Starting on 2025-03-08, Anonymous playback are blocked."
@@ -43,10 +46,9 @@ if [ -z "$DZR_ARL" ]; then
 		echo "Invalid ARL format (expect: ^[0-9a-f]+$):"
 		echo $DZR_ARL
 	done
-	printf "To skip this message, add the following line to your shell profile (e.g. ~/.profile or ~/.zshrc):\n" >&2
-	echo "    export DZR_ARL=$DZR_ARL"
-	sleep 2 # give time to read the warning
-	echo
+	mkdir -p "$(dirname "$DZR_RC")"
+	grep -q '^DZR_ARL=' "$DZR_RC" 2>/dev/null && sed -i "s/^DZR_ARL=.*/DZR_ARL=$DZR_ARL/" "$DZR_RC" || echo "DZR_ARL=$DZR_ARL" >> "$DZR_RC"
+	printf "DZR_ARL saved to %s\n" "$DZR_RC" >&2
 fi
 # dependencies check, see: https://github.com/yne/dzr/issues/12
 for c in jq curl dialog openssl $(echo "$PLAYER" | cut -f 1 -d " "); do
@@ -54,42 +56,162 @@ for c in jq curl dialog openssl $(echo "$PLAYER" | cut -f 1 -d " "); do
 done
 [ -n "$UNMET_DEPENDENCIES" ] && exit 1;
 
+# fetch user info via gw-light API
+export GW="https://www.deezer.com/ajax/gw-light.php"
+gw() { $FETCH "$GW?method=$1&input=3&api_version=1.0&api_token=$DZR_API_TOK" --header "Cookie: sid=$DZR_SID; arl=$DZR_ARL" ${2:+-d "$2"}; }
+if [ -n "$DZR_ARL" ] && [ -z "$DZR_SID" ]; then
+	export DZR_SID=$($FETCH "www.deezer.com/ajax/gw-light.php?method=deezer.ping&api_version=1.0&api_token" | jq -r .results.SESSION)
+	_DZR_USR=$(DZR_API_TOK= gw deezer.getUserData '{}')
+	export DZR_LOVED=$(printf "%s" "$_DZR_USR" | jq -r .results.USER.LOVEDTRACKS_ID)
+	export DZR_USER_ID=$(printf "%s" "$_DZR_USR" | jq -r .results.USER.USER_ID)
+	export DZR_API_TOK=$(printf "%s" "$_DZR_USR" | jq -r .results.checkForm)
+	export DZR_LIC=$(printf "%s" "$_DZR_USR" | jq -r .results.USER.OPTIONS.license_token)
+fi
+
 # main
-API="api.deezer.com"
+trap 'printf "\033]0;\007" >&2' EXIT
+SELF=$(command -v "$0") || SELF="$0"
 DLG_LIST="dialog --keep-tite --output-fd 1 --menu $1: 0 0 0"
 DLG_TEXT="dialog --keep-tite --output-fd 1 --inputbox $1: 0 0"
-FMT_LIST='((if .data then .data else .tracks.data end)[]|("/"+.type+"/"+(.id|tostring), (.title+.name+" "+.artist.name|gsub("\\x22";"")))),([.prev,.next]|map(select(.))|map(.[21:],(.|split("?")[1])))[]'
-FMT_TRKS='"/track/"+([(if .data then .data else .tracks.data end)[]|select(.type=="track")|.id]|@csv)'
 FMT_FUNC='s@[,?].*@@;s@[^a-zA-Z0-9]\{1,\}@_@g;s@[0-9,]\{1,\}@0@g;s@_\{1,\}$@@'
 
-dzr()          { $DLG_LIST /search/track?q= 'by name' /search/artist?q= 'by name' /search/album?q= 'by name' /search/playlist?q= 'by name' /search/user?q= 'by name' /search/radio?q= 'by name' /genre 'list' /radio 'list' /user/0 'by id' ;} 
-dzr_genre_0()  { $DLG_LIST radios '' artists '' ;}
-dzr_radio_0()  { $DLG_LIST tracks '' fans '' ;}
-dzr_album_0()  { $DLG_LIST tracks?limit=999 '' fans '' ;}
-dzr_user_0()   { $DLG_LIST charts '' albums '' playlists '' flow '' tracks '' artists '' ;}
-dzr_artist_0() { $DLG_LIST top?limit=100 '' albums '' fans '' related '' radio '' playlists '' ;}
-dzr_default()  { $FETCH -H "Accept-Language: $LANG" "$API$1" | jq "$FMT_LIST" | xargs $DLG_LIST ▸ "play all /track/" ⇄ "shuf all /track/" ;}
+# jq formatters for gw-light track lists
+GW_FMT_LIST='(.results.data[]|("/track/"+(.SNG_ID|tostring), (.SNG_TITLE+" - "+.ART_NAME|gsub("\\x22";""))))'
+GW_FMT_TRKS='"/track/"+([.results.data[]|.SNG_ID]|map(tostring)|join(","))'
+
+# -- helpers to extract IDs from paths --
+_id() { echo "$1" | sed 's@^/[^/]*/@@;s@/.*@@'; } # /artist/123/top -> 123
+_q()  { echo "$1" | sed 's/.*q=//'; }             # /search/track?q=foo -> foo
+# -- gw data fetchers (raw JSON, reused by browse + play) --
+gw_loved()           { gw playlist.getSongs "{\"playlist_id\":\"$DZR_LOVED\",\"start\":0,\"nb\":10000}"; }
+gw_flow()            { gw radio.getUserRadio "{\"user_id\":\"$DZR_USER_ID\"}"; }
+gw_playlists()       { gw deezer.userMenu '{}'; }
+gw_artists()         { gw deezer.pageProfile "{\"user_id\":\"$DZR_USER_ID\",\"tab\":\"artists\",\"start\":0,\"nb\":10000}"; }
+gw_albums()          { gw deezer.pageProfile "{\"user_id\":\"$DZR_USER_ID\",\"tab\":\"albums\",\"start\":0,\"nb\":10000}"; }
+gw_search_track()    { gw search.music "{\"query\":\"$(_q "$1")\",\"filter\":\"ALL\",\"output\":\"TRACK\",\"start\":0,\"nb\":50}"; }
+gw_search_artist()   { gw search.music "{\"query\":\"$(_q "$1")\",\"filter\":\"ALL\",\"output\":\"ARTIST\",\"start\":0,\"nb\":50}"; }
+gw_search_album()    { gw search.music "{\"query\":\"$(_q "$1")\",\"filter\":\"ALL\",\"output\":\"ALBUM\",\"start\":0,\"nb\":50}"; }
+gw_search_playlist() { gw search.music "{\"query\":\"$(_q "$1")\",\"filter\":\"ALL\",\"output\":\"PLAYLIST\",\"start\":0,\"nb\":50}"; }
+gw_search_radio()    { gw search.music "{\"query\":\"$(_q "$1")\",\"filter\":\"ALL\",\"output\":\"RADIO\",\"start\":0,\"nb\":50}"; }
+gw_artist_top()      { gw artist.getTopTrack "{\"ART_ID\":$(_id "$1"),\"nb\":100}"; }
+gw_artist_albums()   { gw album.getDiscography "{\"ART_ID\":$(_id "$1"),\"nb\":50,\"nb_songs\":0,\"start\":0,\"discography_mode\":\"all\"}"; }
+gw_artist_related()  { gw artist.getRelatedArtist "{\"ART_ID\":$(_id "$1"),\"nb\":25,\"start\":0}"; }
+gw_artist_radio()    { gw radio.getArtistRadio "{\"ART_ID\":$(_id "$1"),\"nb\":40}"; }
+gw_album()           { gw song.getListByAlbum "{\"ALB_ID\":$(_id "$1"),\"nb\":-1}"; }
+gw_playlist()        { gw playlist.getSongs "{\"playlist_id\":\"$(_id "$1")\",\"start\":0,\"nb\":10000}"; }
+gw_radio()           { gw radio.getSongs "{\"RADIO_ID\":$(_id "$1"),\"nb\":40}"; }
+
+# -- jq formatters for non-track lists --
+FMT_ARTIST='(.results.data[]|("/artist/"+(.ART_ID|tostring), (.ART_NAME|gsub("\\x22";""))))'
+FMT_ALBUM='(.results.data[]|("/album/"+(.ALB_ID|tostring), ((.ALB_TITLE+" "+.ART_NAME)|gsub("\\x22";""))))'
+FMT_DISCOG='(.results.data[]|("/album/"+(.ALB_ID|tostring), ((.ALB_TITLE+" ("+(.PHYSICAL_RELEASE_DATE//""|split("-")[0])+")")|gsub("\\x22";""))))'
+FMT_PLAYLIST='(.results.data[]|("/playlist/"+(.PLAYLIST_ID|tostring), (.TITLE|gsub("\\x22";""))))'
+FMT_MY_PLAYLIST='(.results.PLAYLISTS.data[]|select(.TYPE!="4")|("/playlist/"+(.PLAYLIST_ID|tostring), ((.TITLE+" ("+(.NB_SONG|tostring)+")")|gsub("\\x22";""))))'
+FMT_MY_ARTIST='(.results.TAB.artists.data[]|("/artist/"+(.ART_ID|tostring), (.ART_NAME|gsub("\\x22";""))))'
+FMT_MY_ALBUM='(.results.TAB.albums.data[]|("/album/"+(.ALB_ID|tostring), ((.ALB_TITLE+" "+.ART_NAME)|gsub("\\x22";""))))'
+FMT_RADIO='(.results.data[]|("/radio/"+(.RADIO_ID|tostring), (.TITLE|gsub("\\x22";""))))'
+
+# public API for browse-only endpoints (no gw-light equivalent)
+API="api.deezer.com"
+PUB_FMT_GENRE='(.data[]|("/genre/"+(.id|tostring), (.name|gsub("\\x22";""))))'
+PUB_FMT_RADIO='(.data[]|("/radio/"+(.id|tostring), (.title|gsub("\\x22";""))))'
+
+# -- menu functions --
+dzr() {
+	$DLG_LIST \
+		/flow 'my personalised mix' \
+		/loved 'my favourites' \
+		/playlists 'my playlists' \
+		/artists 'my artists' \
+		/albums 'my albums' \
+		/search/track?q= 'search track' \
+		/search/artist?q= 'search artist' \
+		/search/album?q= 'search album' \
+		/search/playlist?q= 'search playlist' \
+		/search/radio?q= 'search radio' \
+		/genre 'list genres' \
+		/radio 'list radios'
+}
+
+dzr_flow()             { gw_flow | jq "$GW_FMT_LIST" | xargs $DLG_LIST ∞ "continuous flow" ▸ "play all" ⇄ "shuffle" ;}
+dzr_loved()            { gw_loved | jq "$GW_FMT_LIST" | xargs $DLG_LIST ▸ "play all" ⇄ "shuffle" ;}
+dzr_playlists()        { gw_playlists | jq "$FMT_MY_PLAYLIST" | xargs $DLG_LIST ;}
+dzr_artists()          { gw_artists | jq "$FMT_MY_ARTIST" | xargs $DLG_LIST ;}
+dzr_albums()           { gw_albums | jq "$FMT_MY_ALBUM" | xargs $DLG_LIST ;}
+# search
+dzr_search_track()     { gw_search_track "$1" | jq "$GW_FMT_LIST" | xargs $DLG_LIST ▸ "play all" ⇄ "shuffle" ;}
+dzr_search_artist()    { gw_search_artist "$1" | jq "$FMT_ARTIST" | xargs $DLG_LIST ;}
+dzr_search_album()     { gw_search_album "$1" | jq "$FMT_ALBUM" | xargs $DLG_LIST ;}
+dzr_search_playlist()  { gw_search_playlist "$1" | jq "$FMT_PLAYLIST" | xargs $DLG_LIST ;}
+dzr_search_radio()     { gw_search_radio "$1" | jq "$FMT_RADIO" | xargs $DLG_LIST ;}
+# genre
+dzr_genre()            { $FETCH "$API/genre" | jq "$PUB_FMT_GENRE" | xargs $DLG_LIST ;} # public API - no gw-light equivalent
+dzr_genre_0()          { $DLG_LIST radios '' artists '' ;}
+dzr_genre_0_radios()   { $FETCH "$API/genre/$(_id "$1")/radios" | jq "$PUB_FMT_RADIO" | xargs $DLG_LIST ;}
+dzr_genre_0_artists()  { $FETCH "$API/genre/$(_id "$1")/artists" | jq '(.data[]|("/artist/"+(.id|tostring), (.name|gsub("\\x22";""))))' | xargs $DLG_LIST ;}
+# radio
+dzr_radio()            { $FETCH "$API/radio" | jq "$PUB_FMT_RADIO" | xargs $DLG_LIST ;} # public API - no gw-light equivalent
+dzr_radio_0()          { gw_radio "$1" | jq "$GW_FMT_LIST" | xargs $DLG_LIST ▸ "play all" ⇄ "shuffle" ;}
+# artist
+dzr_artist_0()         { $DLG_LIST top 'top tracks' albums '' related '' radio '' ;}
+dzr_artist_0_top()     { gw_artist_top "$1" | jq "$GW_FMT_LIST" | xargs $DLG_LIST ▸ "play all" ⇄ "shuffle" ;}
+dzr_artist_0_albums()  { gw_artist_albums "$1" | jq "$FMT_DISCOG" | xargs $DLG_LIST ;}
+dzr_artist_0_related() { gw_artist_related "$1" | jq "$FMT_ARTIST" | xargs $DLG_LIST ;}
+dzr_artist_0_radio()   { gw_artist_radio "$1" | jq "$GW_FMT_LIST" | xargs $DLG_LIST ▸ "play all" ⇄ "shuffle" ;}
+# album
+dzr_album_0()          { gw_album "$1" | jq "$GW_FMT_LIST" | xargs $DLG_LIST ▸ "play all" ⇄ "shuffle" ;}
+# playlist
+dzr_playlist_0()       { gw_playlist "$1" | jq "$GW_FMT_LIST" | xargs $DLG_LIST ▸ "play all" ⇄ "shuffle" ;}
+
+
 play() { # receive /track/1,2,3 from stdin
-	xargs basename | xargs $0-url | ${1:-cat} | while read url id; do
-		$FETCH "$url" | $DZR_SPONGE | $0-dec $id | eval ${PLAYER:-'mpv -'} || break # stop if Ctrl+C : $? = 4
+	xargs basename | xargs $SELF-url | ${1:-cat} | while IFS= read -r line; do
+		printf '%s\n' "$line" | grep -q '	' || { echo "error: unexpected dzr-url output: $line" >&2; break; }
+		url=$(printf '%s\n' "$line" | cut -f1)
+		id=$(printf '%s\n' "$line" | cut -f2)
+		info=$(printf '%s\n' "$line" | cut -f3-)
+		if [ -n "$info" ]; then
+			printf '%s %s # %s\n' "$SELF" "/track/$id" "$info" >&2
+			printf '\033]0;🎶 %s\007' "$(printf '%s' "$info" | sed 's/ \[.*//;s/ (.*)//')" >&2
+		fi
+		$FETCH "$url" | $DZR_SPONGE | $SELF-dec $id | eval ${PLAYER:-'mpv -'} || break # stop if Ctrl+C : $? = 4
 	done
 }
+# play_all: call the gw fetcher for this context, extract track IDs, play
+play_all() { # $1=url $2=FUNC $3=order(cat|shuf)
+	case "$2" in
+	dzr_flow)           gw_flow ;;
+	dzr_loved)          gw_loved ;;
+	dzr_search_track)   gw_search_track "$1" ;;
+	dzr_artist_0_top)   gw_artist_top "$1" ;;
+	dzr_artist_0_radio) gw_artist_radio "$1" ;;
+	dzr_album_0)        gw_album "$1" ;;
+	dzr_playlist_0)     gw_playlist "$1" ;;
+	dzr_radio_0)        gw_radio "$1" ;;
+	*) return 1 ;;
+	esac | jq "$GW_FMT_TRKS" | play "$3"
+}
 for url in "$@"; do
+	case $url in
+		/track/*) echo $url | play; continue ;; # direct play
+	esac
+
 	FUNC=$(echo "dzr_$url" | sed "$FMT_FUNC") # path (/search/artist?q=x) to function (dzr_search_artist)
-	type $FUNC 1>/dev/null 2>/dev/null || FUNC=dzr_default
+	type $FUNC 1>/dev/null 2>/dev/null || { echo "error: unknown path $url" >&2; continue; }
 	case $url in # catch url that need user input (query, id)
 		*=)  url="$url$($DLG_TEXT ''|jq -rR '.|@uri')" ;; # escaped query
 		*/0) url="$url$($DLG_TEXT ''|jq -rR '.|@uri')" ;; # escaped id
-		/track/*) echo $url | play; break ;;
 	esac
-	echo "$0 $url" >&2
+
+	echo "$SELF $url" >&2
 	while path=$($FUNC $url); do # browse REPL
 		case "$path" in
-		▸) echo "$API$url"; $FETCH "$API$url" | jq "$FMT_TRKS" | play cat; break ;;
-		⇄) echo "$API$url"; $FETCH "$API$url" | jq "$FMT_TRKS" | play shuf; break ;;
-		/*) $0 "$path";;
-		*)  $0 "$url/$path";;
+		▸) play_all "$url" "$FUNC" cat; break ;;
+		⇄) play_all "$url" "$FUNC" shuf; break ;;
+		∞) while true; do gw_flow | jq "$GW_FMT_TRKS" | play cat || break; done; break ;;
+		/*) $SELF "$path";;
+		*)  $SELF "$url/$path";;
 		esac
 	done
 done
-[ $# -eq 0 ] && $0 '' # give an argument to iterate over (if none given)
+[ $# -eq 0 ] && $SELF '' # give an argument to iterate over (if none given)
