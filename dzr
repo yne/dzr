@@ -161,7 +161,10 @@ play() { # receive /track/1,2,3 from stdin
 		url=$(printf '%s\n' "$line" | cut -f1)
 		id=$(printf '%s\n' "$line" | cut -f2)
 		info=$(printf '%s\n' "$line" | cut -f3-)
-		[ -n "$info" ] && printf '🎶 %s\n' "$info" >&2 && printf '\033]0;🎶 %s\007' "$(printf '%s' "$info" | sed 's/ \[.*//;s/ (.*)//')" >&2
+		if [ -n "$info" ]; then
+			printf '%s %s # %s\n' "$SELF" "/track/$id" "$info" >&2
+			printf '\033]0;🎶 %s\007' "$(printf '%s' "$info" | sed 's/ \[.*//;s/ (.*)//')" >&2
+		fi
 		$FETCH "$url" | $DZR_SPONGE | $SELF-dec $id | eval ${PLAYER:-'mpv -'} || break # stop if Ctrl+C : $? = 4
 	done
 }
